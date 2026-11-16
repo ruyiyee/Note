@@ -8,9 +8,10 @@ import { Placeholder } from '@tiptap/extensions';
 import { generateHTML } from '@tiptap/core';
 import { signedUrl } from './attachments';
 import { Drawing } from './drawing';
+import { PageBreak } from './pages';
 
 /** The four highlight colours offered in the toolbar. */
-export const HIGHLIGHTS = ['#ffe9ef', '#ffd3df', '#fbbccd', '#f4a6bd'];
+export const HIGHLIGHTS = ['#fdeaf1', '#fbd5e2', '#f7bcd0', '#f2a0bc'];
 
 /** Image node that stores a private storage path and resolves a signed URL when shown. */
 export const StoredImage = Image.extend({
@@ -43,6 +44,7 @@ export function baseExtensions() {
     TableKit.configure({ table: { resizable: false } }),
     StoredImage,
     Drawing,
+    PageBreak,
   ];
 }
 

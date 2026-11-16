@@ -9,11 +9,12 @@ import { db } from '../lib/db';
 import { printNotes } from '../lib/export';
 import { summarize } from '../lib/text';
 import { askConfirm } from './Dialog';
+import { pageCount } from '../lib/pages';
 import History from './History';
 
-interface Props { note: Note; folders: Folder[]; onBack: () => void; onOpen: (id: string) => void }
+interface Props { note: Note; folders: Folder[]; onBack: () => void; onOpen: (id: string) => void; wide: boolean; onToggleWide: () => void }
 
-export default function Editor({ note, folders, onBack, onOpen }: Props) {
+export default function Editor({ note, folders, onBack, onOpen, wide, onToggleWide }: Props) {
   const [title, setTitle] = useState(note.title);
   const [saving, setSaving] = useState(false);
   const [panel, setPanel] = useState<null | 'history' | 'summary'>(null);
@@ -74,6 +75,15 @@ export default function Editor({ note, folders, onBack, onOpen }: Props) {
   const titleTimer = useRef<ReturnType<typeof setTimeout>>();
   const onTitle = (v: string) => { setTitle(v); clearTimeout(titleTimer.current); titleTimer.current = setTimeout(() => updateNote(note.id, { title: v }), 400); };
 
+  const pages = pageCount(note.content);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const goToPage = (n: number) => {
+    const root = scrollRef.current; if (!root) return;
+    if (n <= 1) return root.scrollTo({ top: 0, behavior: 'smooth' });
+    const el = root.querySelectorAll('.ProseMirror > .page-break')[n - 2] as HTMLElement | undefined;
+    if (el) root.scrollTo({ top: el.offsetTop - 24, behavior: 'smooth' });
+  };
+
   const summary = useMemo(() => (panel === 'summary' ? summarize(note.content_text, 5) : []), [panel, note.content_text]);
   const status = saving ? 'Saving' : note._dirty === 1 ? 'Saved on this device, waiting to sync' : 'Saved';
   const item = (label: string, run: () => void, cls = '') => <button className={cls} onClick={() => { setMenu(false); run(); }}>{label}</button>;
@@ -84,6 +94,8 @@ export default function Editor({ note, folders, onBack, onOpen }: Props) {
         <button className="text-btn mobile-only" onClick={() => { flush(); onBack(); }}>Back</button>
         <span className={`save-state ${note._dirty === 1 || saving ? 'pending' : ''}`} title={`Last edited ${new Date(note.updated_at).toLocaleString()}`}>{status}</span>
         <span className="grow" />
+        {pages > 1 && <PageJump pages={pages} onGo={goToPage} />}
+        <button className="text-btn desktop-only" onClick={onToggleWide} title="Ctrl/⌘ Shift E">{wide ? 'Exit full width' : 'Full width'}</button>
         {!note.deleted_at && <button className={`text-btn ${note.favorite ? 'on' : ''}`} onClick={() => updateNote(note.id, { favorite: !note.favorite })}>{note.favorite ? 'Favourited' : 'Favourite'}</button>}
         <div className="menu-wrap">
           <button className="text-btn" onClick={() => setMenu(!menu)} aria-haspopup="menu" aria-expanded={menu}>More</button>
@@ -102,7 +114,7 @@ export default function Editor({ note, folders, onBack, onOpen }: Props) {
       </header>
 
       <div className="editor-body">
-        <div className="editor-scroll">
+        <div className="editor-scroll" ref={scrollRef}>
           <div className="doc">
             {note.deleted_at && <p className="banner">This note is in Trash. <button className="text-btn on" onClick={() => restoreNote(note.id)}>Restore</button></p>}
             <textarea className="note-title" rows={1} placeholder="Untitled" value={title} onChange={(e) => onTitle(e.target.value)}
@@ -149,6 +161,17 @@ export default function Editor({ note, folders, onBack, onOpen }: Props) {
   );
 }
 
+/** "Go to page" control: type or pick a page number. */
+function PageJump({ pages, onGo }: { pages: number; onGo: (n: number) => void }) {
+  const [v, setV] = useState('');
+  return (
+    <form className="page-jump" onSubmit={(e) => { e.preventDefault(); const n = Math.min(pages, Math.max(1, parseInt(v, 10) || 1)); onGo(n); setV(''); }}>
+      <label className="muted small" htmlFor="page-jump">Page</label>
+      <input id="page-jump" inputMode="numeric" placeholder={`1–${pages}`} value={v} onChange={(e) => setV(e.target.value.replace(/\D/g, ''))} aria-label={`Go to page, 1 to ${pages}`} />
+    </form>
+  );
+}
+
 const fmtSize = (b: number) => (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
 
 function Toolbar({ editor, onAttach }: { editor: TEditor; onAttach: () => void }) {
@@ -185,6 +208,7 @@ function Toolbar({ editor, onAttach }: { editor: TEditor; onAttach: () => void }
         <B run={() => c().deleteTable().run()} label="Delete table" />
       </> : <B run={() => c().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} label="Table" />}
       <B run={() => c().insertContent([{ type: 'drawing' }, { type: 'paragraph' }]).run()} label="Draw" title="Add a drawing area" />
+      <B run={() => c().insertPageBreak().run()} label="New page" title="Start a new page below" />
       <B run={onAttach} label="Attach" title="Attach an image or PDF" />
     </div>
   );

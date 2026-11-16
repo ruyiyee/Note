@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { applyTheme, getTheme, type Theme } from '../lib/theme';
 import { exportJSON, exportMarkdown } from '../lib/export';
 import { clearLocal } from '../lib/db';
 import { deleteAllFiles } from '../lib/attachments';
@@ -10,7 +9,6 @@ import { supabaseRemote } from '../lib/remote';
 import { askConfirm, askText } from './Dialog';
 
 export default function Settings({ onClose, session }: { onClose: () => void; session: Session }) {
-  const [theme, setTheme] = useState<Theme>(getTheme());
   const [msg, setMsg] = useState<string | null>(null);
   const [pw, setPw] = useState('');
 
@@ -35,10 +33,6 @@ export default function Settings({ onClose, session }: { onClose: () => void; se
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal settings" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Settings">
         <header><h3>Settings</h3><button className="text-btn" onClick={onClose}>Close</button></header>
-        <section>
-          <h4>Appearance</h4>
-          <div className="seg">{(['system', 'light', 'dark'] as Theme[]).map((t) => <button key={t} className={theme === t ? 'active' : ''} onClick={() => { setTheme(t); applyTheme(t); }}>{t[0].toUpperCase() + t.slice(1)}</button>)}</div>
-        </section>
         <section>
           <h4>Account</h4>
           <p className="small">Signed in as <strong>{session.user.email}</strong></p>

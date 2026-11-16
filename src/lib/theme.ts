@@ -1,7 +1,2 @@
-export type Theme = 'system' | 'light' | 'dark';
-export function getTheme(): Theme { try { return (localStorage.getItem('theme') as Theme) || 'system'; } catch { return 'system'; } }
-export function applyTheme(t: Theme = getTheme()) {
-  try { localStorage.setItem('theme', t); } catch { /* ignore */ }
-  if (t === 'system') document.documentElement.removeAttribute('data-theme');
-  else document.documentElement.setAttribute('data-theme', t);
-}
+// The app has a single light theme (navy and pink). Dark mode was removed on request.
+export function applyTheme() { document.documentElement.removeAttribute('data-theme'); }

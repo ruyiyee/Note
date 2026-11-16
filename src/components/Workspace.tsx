@@ -31,6 +31,8 @@ export default function Workspace({ session }: { session: Session }) {
   const [pane, setPane] = useState<Pane>('list');
   const [showSettings, setShowSettings] = useState(false);
   const [sidebarHidden, setSidebarHidden] = useState(false);
+  const [wide, setWide] = useState(() => { try { return localStorage.getItem('wide') === '1'; } catch { return false; } });
+  const toggleWide = () => setWide((w) => { try { localStorage.setItem('wide', w ? '0' : '1'); } catch { /* ignore */ } return !w; });
 
   const notes = useLiveQuery(() => db.notes.toArray(), [], []);
   const allFolders = useLiveQuery(() => db.folders.toArray(), [], []);
@@ -74,6 +76,7 @@ export default function Workspace({ session }: { session: Session }) {
       if (k === 'k') { e.preventDefault(); setPane('list'); setTimeout(() => (document.querySelector('.search input') as HTMLInputElement)?.focus(), 10); }
       else if (k === 'n' && e.altKey) { e.preventDefault(); newNote(); }
       else if (k === '\\') { e.preventDefault(); setSidebarHidden((h) => !h); }
+      else if (k === 'e' && e.shiftKey) { e.preventDefault(); toggleWide(); }
       else if (k === 's') { e.preventDefault(); syncNow(supabaseRemote); }
     };
     window.addEventListener('keydown', onKey);
@@ -85,7 +88,7 @@ export default function Workspace({ session }: { session: Session }) {
   const chooseView = (v: View) => { setView(v); setPane('list'); setQuery(''); };
 
   return (
-    <div className={`workspace pane-${pane} ${sidebarHidden ? 'no-sidebar' : ''} ${fullWidth ? 'full' : ''}`}>
+    <div className={`workspace pane-${pane} ${sidebarHidden ? 'no-sidebar' : ''} ${fullWidth ? 'full' : ''} ${wide && selected && !fullWidth ? 'wide' : ''}`}>
       <Sidebar view={view} onView={chooseView} folders={folders} onSettings={() => setShowSettings(true)} />
       {view.kind === 'vocab' ? <VocabView onBack={() => setPane('sidebar')} /> :
        view.kind === 'tasks' ? <TasksView onBack={() => setPane('sidebar')} /> :
@@ -96,7 +99,7 @@ export default function Workspace({ session }: { session: Session }) {
             selectedId={selectedId} onOpen={openNote} onNew={newNote} onBack={() => setPane('sidebar')}
           />
           {selected ? (
-            <Editor key={selected.id} note={selected} folders={folders} onBack={() => setPane('list')} onOpen={openNote} />
+            <Editor key={selected.id} note={selected} folders={folders} onBack={() => setPane('list')} onOpen={openNote} wide={wide} onToggleWide={toggleWide} />
           ) : (
             <main className="editor empty-editor"><p className="muted">Select a note, or create a new one.</p></main>
           )}

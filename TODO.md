@@ -1,6 +1,6 @@
 # TODO / status
 
-_Last updated: 2026-11-16 (after the "simplify" redesign)_
+_Last updated: 2026-11-16 (navy and pink theme, drawing tools, pages)_
 
 ## Done
 - [x] Supabase schema with RLS on every table, private storage bucket, version-history trigger, account-deletion RPC, ping RPC (`0001_init.sql`); `items` table + `cards.notes` (`0002_items_and_card_notes.sql`)
@@ -15,12 +15,16 @@ _Last updated: 2026-11-16 (after the "simplify" redesign)_
 - [x] Tasks: standalone list with optional due date
 - [x] Calendar: add entries directly to a day
 - [x] Vocabulary: word, definition, example, personal notes; flashcard review with SM-2
-- [x] Account deletion; light/dark/system theme; responsive phone layout; installable PWA; offline app shell
+- [x] Navy and pink theme (light only), full-width writing mode
+- [x] Drawing: clean split-stroke eraser with 3 sizes, undo/redo, zoom and pan (buttons, Ctrl/⌘+wheel, pinch), lasso select/move/resize/delete
+- [x] Pages within a note (dashed "Page N" separators, go-to-page box, one page per sheet in PDF)
+- [x] Account deletion; responsive phone layout; installable PWA; offline app shell
 - [x] GitHub Pages deploy workflow + daily Supabase keep-alive workflow
 
 ## Verified
-- [x] `npm test`: 12 unit tests (sync engine incl. offline queue, edit-during-upload, one-table-failure isolation, folder deletion keeps notes; search; summary; SM-2)
+- [x] `npm test`: 21 unit tests (incl. eraser splitting, eraser size, lasso, move/resize, legacy stroke conversion, page count) + (sync engine incl. offline queue, edit-during-upload, one-table-failure isolation, folder deletion keeps notes; search; summary; SM-2)
 - [x] `node tests/e2e/smoke.cjs` against a simulated Supabase API: folder → notebook → note, highlight + drawing saved, links not created, summary panel, PDF export content (note + notebook), search, tasks, calendar entry, vocabulary add + review, phone-sized second device receives note and drawing, no horizontal overflow, offline edit syncs on reconnect, reload persistence, no console errors
+- [x] `node tests/e2e/drawing.cjs`: draw, partial erase with unchanged stroke width, undo/redo of erase, lasso move + delete + undo, zoom, three pages + go to page 3, full width (878px → 1440px), autosave to server, strokes and pages intact after reload, PDF content
 - [x] Live checks on the real project (2026-11-16): site loads, service worker active, anon cannot read or insert rows, anon cannot call `delete_my_account`, storage bucket not public
 - [ ] **Not yet verified signed-in on the real project:** real sign-up/login, real cross-device sync, attachment upload to Storage, version history rows, account deletion, second user cannot see first user's rows
 
@@ -31,7 +35,8 @@ _Last updated: 2026-11-16 (after the "simplify" redesign)_
 4. Import from a JSON backup; include attachment files in export
 5. Purge Trash older than 30 days automatically
 6. Dedicated "set new password" screen for the `PASSWORD_RECOVERY` auth event
-7. Drawing: pressure/smoothing, more pen sizes (only if the owner asks; they want minimal)
+7. Drawing: pressure, pen sizes, Apple Pencil palm rejection (only if the owner asks; they want minimal)
+8. Drawing undo history is per open note (not kept after closing the note); the note itself is versioned server-side
 
 ## Known issues / limitations
 - Attachments and version history need a connection

@@ -39,10 +39,12 @@ Six sections only: **All Notes, Favourites, Tasks, Calendar, Vocabulary, Trash**
 - **Folders → notebooks → notes.** Both levels live in the `folders` table: a row with `parent_id = null` is a folder, a row with a `parent_id` is a notebook inside it. A note's `folder_id` points at its notebook (or is null = unfiled, shown in All Notes).
 - **Tasks** and **Calendar** entries are standalone rows in `items` (`kind` = `task` or `event`). They are not linked to notes.
 - **Vocabulary** entries are rows in `cards` (word, definition, example, personal notes) reviewed with SM-2 spaced repetition.
-- **Editor:** text styles, bold/italic/underline, four pink highlight colours, lists, checklist, table, freehand drawing block (`src/lib/drawing.ts`, strokes stored in the note JSON), image/PDF attachments. **Hyperlinks are deliberately disabled.**
+- **Editor:** text styles, bold/italic/underline, four pink highlight colours, lists, checklist, table, freehand drawing block, pages, image/PDF attachments. **Hyperlinks are deliberately disabled.** "Full width" (Ctrl/⌘+Shift+E) hides the sidebar and list so the note uses nearly the whole screen.
+- **Drawing block** (`src/lib/drawing.ts`): strokes are point lists `{p:[x,y,...], c, w}` in canvas pixels, stored in the note JSON (old `{d}` path strokes are converted on load). Tools: Ink/Pink pen, Eraser (small/medium/large; removes only the touched part of a stroke by splitting it), Lasso (select, drag to move, corner handle to resize, Delete), Move view (pan). Zoom 50–400% with buttons, Ctrl/⌘+wheel or pinch. Undo/Redo (also Ctrl/⌘+Z, Ctrl/⌘+Shift+Z) cover drawing, erasing, lasso and clear; the history lives while the note is open. Every finished gesture is saved into the document, so it autosaves and syncs.
+- **Pages** (`src/lib/pages.ts`): a `pageBreak` node shown as a dashed line labelled "Page N" (CSS counter). The note stays continuous; the header's "Page" box jumps to a page number; PDF export starts each page on a new sheet.
 - **Per note (More menu):** Summary (local extractive algorithm, not an AI service), Version history, Duplicate, Export PDF, Move to Trash.
 - **PDF export** of a note or a whole notebook uses the browser print dialog ("Save as PDF"), see `printNotes` in `src/lib/export.ts`.
-- **Design rules from the owner:** soft pink, four pink tokens (`--pink-1..4` in `src/styles.css`), no emojis, no icons, text labels only, generous spacing. Keep it that way.
+- **Design rules from the owner:** navy and pink, five colours (`--white #ffffff`, `--pale #fde4ec`, `--rose #e86a92`, `--navy #1f2a44`, `--grey #8a93a8` in `src/styles.css`), navy sidebar, light theme only (no dark mode), no emojis, no icons, text labels only, generous spacing. Keep it that way.
 - Removed on purpose: Inbox, Recent, Archive, tags, templates, links/backlinks/graph, flashcard generation from notes, dictionary lookup. The database columns (`inbox`, `archived`, `pinned`, `tags`, `color`, `icon`) still exist and are simply unused; old data is preserved and all non-deleted notes show in All Notes.
 
 ## Project layout
@@ -63,10 +65,10 @@ src/
     SyncBadge.tsx, Auth.tsx
   lib/
     supabase.ts db.ts sync.ts remote.ts store.ts types.ts
-    text.ts (search, summary)  srs.ts (SM-2)  drawing.ts (drawing block)
+    text.ts (search, summary)  srs.ts (SM-2)  drawing.ts (drawing block)  pages.ts (page separators)
     extensions.ts (TipTap setup + private image node)  attachments.ts  export.ts  theme.ts
 supabase/migrations/      0001_init.sql, 0002_items_and_card_notes.sql (idempotent, run in order)
-tests/                    vitest unit tests; tests/e2e/smoke.cjs browser smoke test with a simulated server
+tests/                    vitest unit tests; tests/e2e/smoke.cjs and drawing.cjs browser tests with a simulated server
 .github/workflows/deploy.yml        test + build + deploy to GitHub Pages on push to main
 .github/workflows/keepalive.yml     daily ping so the free Supabase project is not paused
 ```
@@ -118,7 +120,7 @@ There is no custom backend. The client talks to Supabase directly:
 "Summary" picks the key sentences of a note with a word-frequency algorithm in `src/lib/text.ts`. It runs on the device; nothing is sent anywhere.
 
 ## Keyboard shortcuts
-`Ctrl/⌘+Alt+N` new note · `Ctrl/⌘+K` search · `Ctrl/⌘+\` toggle sidebar · `Ctrl/⌘+S` sync now · `Ctrl/⌘+B/I/U` formatting.
+`Ctrl/⌘+Alt+N` new note · `Ctrl/⌘+K` search · `Ctrl/⌘+Shift+E` full width · `Ctrl/⌘+\` toggle sidebar · `Ctrl/⌘+S` sync now · `Ctrl/⌘+B/I/U` formatting.
 
 ## For the next agent
 Read `TODO.md` first. Keep all local writes inside `src/lib/store.ts` so sync stays correct. Every schema change goes into a new numbered, idempotent migration in `supabase/migrations/`, and `src/lib/types.ts` must match it. Run `npm test && npm run build` before you push.

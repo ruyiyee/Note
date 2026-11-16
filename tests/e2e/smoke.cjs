@@ -56,8 +56,8 @@ const OUT = process.env.SMOKE_OUT || 'tests/e2e/out-';
   const json = JSON.stringify(note?.content ?? {});
   results.noteOnServer = !!note && note.content_text.includes('Mitochondria');
   results.noteInNotebook = !!note && server.folders.get(note.folder_id)?.name === 'Biology' && !!server.folders.get(note.folder_id)?.parent_id;
-  results.highlightSaved = json.includes('"highlight"') && json.includes('#fbbccd');
-  results.drawingSaved = /"type":"drawing".*"d":"M /.test(json);
+  results.highlightSaved = json.includes('"highlight"') && json.includes('#f7bcd0');
+  results.drawingSaved = /"type":"drawing".*"p":\[/.test(json);
   results.saveState = await a.textContent('.save-state');
   await a.screenshot({ path: OUT + 'desktop.png' });
 
