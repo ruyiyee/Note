@@ -29,6 +29,7 @@ _Last updated: 2026-11-16_
 ## Verified
 - [x] `npm test`: 13 unit tests (sync engine against a fake server: push, pull, local-wins-while-dirty, fresh-device pull, edit-during-upload, offline queue; text utils; SM-2)
 - [x] `npm run build` (type check + production build) passes
+- [x] `node tests/e2e/smoke.cjs` (with `vite preview` on :4173): two-browser smoke test against a simulated Supabase API: create from template, autosave, cloud push, search highlight, flashcard generation, all views open, second (mobile) device receives note, offline edit queued then synced on reconnect, reload persistence, no console errors
 - [ ] **Not yet verified against the real Supabase project or on the live URL.** The build container can't reach supabase.co. To do: sign up, create/edit a note, reload, second browser/device sync, attachment upload, offline edit → reconnect, export, account deletion, RLS check (a second user can't read the first user's rows)
 
 ## Next priorities
