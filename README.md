@@ -1,1 +1,112 @@
-# Note
+# Notes
+
+A personal, cloud-synced note-taking app. It runs in the browser and installs as a PWA on desktop and mobile. Your data lives in **your own Supabase project** (Postgres, Auth and Storage) and is cached on each device for offline use. The app has no dependency on Claude or any paid AI service.
+
+- **Live URL:** `https://ruyiyee.github.io/note/` (GitHub Pages, deployed by `.github/workflows/deploy.yml`)
+- **Cost:** $0 on the free tiers of GitHub Pages and Supabase. The limits are listed below.
+
+## Architecture
+
+```
+Browser / installed PWA (React + TypeScript + Vite)
+ ├─ UI: src/components/*  (sidebar · note list · TipTap editor · side panels · full-pane views)
+ ├─ Local cache + outbox: IndexedDB via Dexie (src/lib/db.ts)
+ ├─ Sync engine: src/lib/sync.ts  (push dirty rows → pull by server updated_at cursor)
+ ├─ Remote adapter: src/lib/remote.ts  (supabase-js + Realtime change feed)
+ └─ Service worker (vite-plugin-pwa / Workbox): app shell works offline
+                 │ HTTPS, user JWT
+                 ▼
+Supabase project (owned by the user)
+ ├─ Auth: email + password, magic link, password reset
+ ├─ Postgres: folders, notes, note_versions, attachments, cards — all with RLS "user_id = auth.uid()"
+ ├─ Storage: private bucket "attachments", object paths "<user_id>/<uuid>-<name>", owner-only policies
+ └─ Realtime: change events trigger a pull on other devices
+```
+
+### How sync works (`src/lib/sync.ts`)
+1. Every local write goes through `src/lib/store.ts`. It writes the row to IndexedDB with `_dirty=1`, bumps `_rev` and schedules a sync after about 0.8 s.
+2. **push:** dirty rows are upserted to Supabase. Folders go first, parents before children. A row's `_dirty` is cleared only if `_rev` didn't change during the upload.
+3. **pull:** rows with `updated_at > cursor` (one cursor per table, kept in the `meta` table) are fetched. `updated_at` is always set by a server trigger, so device clocks don't matter. Local rows that are still dirty are not overwritten.
+4. **When it runs:** on app start, on local edits, on window focus or visibility change, when the device comes back online, every 60 s, and on Realtime events.
+5. **Conflicts:** the last write wins, per row. Overwritten note content can be recovered from **version history**: the `notes_snapshot` trigger stores the previous content at most once every 10 minutes per note.
+6. **Deletes:** deletes are soft (`deleted_at`, shown in Trash). "Empty trash" hard-deletes the rows on the server and requires a connection.
+
+The sync engine is unit-tested against an in-memory fake server (`tests/sync.test.ts`).
+
+## Project layout
+```
+src/
+  App.tsx                 auth gate, local-cache owner check
+  components/
+    Workspace.tsx         layout, views, keyboard shortcuts, sync wiring
+    Sidebar.tsx           nav, nested folders (colour/icon/rename/subfolder/delete, drag notes onto folders), tags
+    NoteList.tsx          filtering, global search with filters and highlighted snippets, sorting, Trash
+    Editor.tsx            TipTap editor, toolbar, autosave, attachments, tags + suggestions, links/related panel
+    History.tsx           version history (server snapshots) + restore
+    StudyPanel.tsx        local summary, keywords, flashcard/question generation, quick quiz
+    VocabView.tsx         vocabulary decks, SM-2 review, stats, free dictionary lookup, speech
+    TasksView.tsx         all checklist items across notes, deadlines via "@YYYY-MM-DD"
+    CalendarView.tsx      month grid of notes created/edited and tasks due
+    GraphView.tsx         force-directed graph of [[wiki links]] and shared tags
+    Settings.tsx          theme, password, export (JSON/Markdown), sign-out, account deletion, shortcuts
+    TemplatePicker.tsx, SyncBadge.tsx, Auth.tsx
+  lib/
+    supabase.ts db.ts sync.ts remote.ts store.ts types.ts
+    text.ts (search, tasks, links, summary, card generation)  srs.ts (SM-2)
+    extensions.ts (TipTap setup + private image node)  attachments.ts  export.ts  templates.ts  theme.ts
+supabase/migrations/0001_init.sql   full schema, RLS, storage bucket + policies, RPCs (idempotent)
+tests/                              vitest unit tests
+.github/workflows/deploy.yml        test + build + deploy to GitHub Pages on push to main
+.github/workflows/keepalive.yml     daily ping so the free Supabase project is not paused
+```
+
+## Database schema (see `supabase/migrations/0001_init.sql`)
+| table | purpose | key columns |
+|---|---|---|
+| `folders` | nested folders | `parent_id`, `name`, `color`, `icon`, `position`, `deleted_at` |
+| `notes` | notes | `folder_id`, `title`, `content` (TipTap JSON), `content_text` (plain text), `tags text[]`, `pinned`, `favorite`, `archived`, `inbox`, `deleted_at` |
+| `note_versions` | history snapshots (written by trigger) | `note_id`, `title`, `content`, `created_at` |
+| `attachments` | file metadata, files in Storage | `note_id`, `path`, `name`, `mime`, `size`, `deleted_at` |
+| `cards` | vocabulary and Q&A flashcards with SM-2 state | `kind`, `deck`, `front`, `back`, `example`, `pronunciation`, `ease`, `interval_days`, `reps`, `lapses`, `due_at` |
+
+Every table has `id uuid` (generated on the client), `user_id` (defaults to `auth.uid()`), `created_at` and `updated_at` (set by the server). RLS policy `own rows`: `user_id = auth.uid()` for all operations, `authenticated` role only.
+
+RPCs: `delete_my_account()` deletes the caller's auth user, and the delete cascades to all rows. The client removes Storage files first. `ping()` is used by the keep-alive workflow.
+
+## API
+There is no custom backend. The client talks to Supabase directly:
+- PostgREST: `/rest/v1/<table>` (select/upsert/delete, filtered by RLS) and `/rest/v1/rpc/<fn>`
+- Auth: `/auth/v1/*` via `supabase.auth`
+- Storage: `/storage/v1/object/attachments/<user_id>/...` (upload, signed URLs, list, remove)
+- Realtime: `postgres_changes` on the four synced tables, filtered by `user_id`
+
+## Environment variables
+| name | where | notes |
+|---|---|---|
+| `VITE_SUPABASE_URL` | `.env.production` (committed), `.env.local` (dev) | Project URL. Public. |
+| `VITE_SUPABASE_ANON_KEY` | same | anon / publishable key. Public by design; access is enforced by RLS. |
+| `BASE_PATH` | set by the deploy workflow | `/<repo>/` for GitHub Pages |
+
+**Never** commit the `service_role` / secret key or the database password. The app doesn't need them.
+
+## Setup from scratch
+1. **Supabase:** create a free project. In the **SQL Editor**, paste and run `supabase/migrations/0001_init.sql`. The script is safe to re-run.
+2. **Auth URLs:** in Supabase go to Authentication → URL Configuration. Set **Site URL** to the deployed URL (e.g. `https://ruyiyee.github.io/note/`) and add it under **Redirect URLs**. Add `http://localhost:5173/` too for local development. Confirmation and magic-link emails use these URLs.
+3. Put the project URL and anon key in `.env.production`. For local development, also copy them to `.env.local`.
+4. **GitHub Pages:** go to repo Settings → Pages → Build and deployment → Source: **GitHub Actions**. Pushing to `main` then deploys.
+5. **Local development:** `npm install && npm run dev`. Tests: `npm test`. Type check and production build: `npm run build`.
+
+## Free-tier limits (honest list)
+- **Supabase Free:** 500 MB database, 1 GB file storage, 50 MB per file (enforced in the app and the bucket), and 50,000 monthly active users. **Projects are paused after 7 days with no activity.** The data is kept, and you resume the project from the Supabase dashboard. The `keepalive.yml` workflow pings the project daily to prevent the pause. GitHub disables scheduled workflows in a repo with no commits for 60 days. If that happens, re-enable it under Actions → "Keep Supabase awake", or keep using the app, since normal use also counts as activity.
+- **Supabase's built-in email** sends only a few auth emails per hour. For heavier use, configure custom SMTP under Auth → SMTP.
+- **Backups:** the free tier has no downloadable point-in-time backups. Use Settings → Export regularly. The JSON export contains all rows, but it doesn't include attachment files; download those from Supabase Storage.
+- **GitHub Pages:** free for public repos. The repo contains only code and public keys, no notes.
+
+## Optional "smart" features (no AI service, no cost)
+Summaries, keyword and tag suggestions, related notes and flashcard generation are simple algorithms in `src/lib/text.ts`. They run on the device. Dictionary lookup in Vocabulary uses the free public API `api.dictionaryapi.dev` (English only, no key). It runs only when you press "Look up". Pronunciation uses the browser's built-in speech synthesis.
+
+## Keyboard shortcuts
+`Ctrl/⌘+Alt+N` new note · `Ctrl/⌘+Shift+I` quick capture · `Ctrl/⌘+K` search · `Ctrl/⌘+\` toggle sidebar · `Ctrl/⌘+S` sync now · standard TipTap formatting shortcuts.
+
+## For the next agent
+Read `TODO.md` first. Keep all local writes inside `src/lib/store.ts` so sync stays correct. Every schema change goes into a new numbered, idempotent migration in `supabase/migrations/`, and `src/lib/types.ts` must match it. Run `npm test && npm run build` before you push.
