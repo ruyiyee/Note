@@ -2,7 +2,7 @@
 import { db } from './db';
 import { scheduleSync } from './sync';
 import { docToText } from './text';
-import type { Card, Folder, Note, SyncedTable } from './types';
+import type { Card, Folder, Item, Note, SyncedTable } from './types';
 
 let currentUser = '';
 export function setCurrentUser(id: string) { currentUser = id; }
@@ -53,13 +53,12 @@ export function createFolder(name: string, parent_id: string | null = null): Pro
   return insert<Folder>('folders', { id: uuid(), user_id: currentUser, parent_id, name, color: null, icon: null, position: Date.now(), created_at: t, updated_at: t, deleted_at: null });
 }
 export const updateFolder = (id: string, patch: Partial<Folder>) => write<Folder>('folders', id, patch);
+/** Deletes a folder or notebook (and a folder's notebooks). Notes inside are kept, unfiled. */
 export async function trashFolder(id: string) {
-  // Notes inside move to "no folder" rather than being deleted; subfolders move up.
-  const f = await db.folders.get(id);
+  const kids = await db.folders.where('parent_id').equals(id).toArray();
+  for (const k of kids) if (!k.deleted_at) await trashFolder(k.id);
   const notes = await db.notes.where('folder_id').equals(id).toArray();
   for (const n of notes) await updateNote(n.id, { folder_id: null });
-  const kids = await db.folders.where('parent_id').equals(id).toArray();
-  for (const k of kids) await updateFolder(k.id, { parent_id: f?.parent_id ?? null });
   await write<Folder>('folders', id, { deleted_at: now() });
 }
 
@@ -67,12 +66,20 @@ export async function trashFolder(id: string) {
 export function createCard(init: Partial<Card>): Promise<Card> {
   const t = now();
   return insert<Card>('cards', {
-    id: uuid(), user_id: currentUser, kind: 'vocab', deck: 'Vocabulary', front: '', back: '', example: '', pronunciation: '',
+    id: uuid(), user_id: currentUser, kind: 'vocab', deck: 'Vocabulary', front: '', back: '', example: '', pronunciation: '', notes: '',
     source_note_id: null, ease: 2.5, interval_days: 0, reps: 0, lapses: 0, due_at: t, last_reviewed_at: null,
     created_at: t, updated_at: t, deleted_at: null, ...init,
   });
 }
 export const updateCard = (id: string, patch: Partial<Card>) => write<Card>('cards', id, patch);
 export const trashCard = (id: string) => write<Card>('cards', id, { deleted_at: now() });
+
+// ---------- tasks and calendar entries ----------
+export function createItem(init: Partial<Item>): Promise<Item> {
+  const t = now();
+  return insert<Item>('items', { id: uuid(), user_id: currentUser, kind: 'task', title: '', date: null, done: false, created_at: t, updated_at: t, deleted_at: null, ...init });
+}
+export const updateItem = (id: string, patch: Partial<Item>) => write<Item>('items', id, patch);
+export const trashItem = (id: string) => write<Item>('items', id, { deleted_at: now() });
 
 export { write as writeRow, insert as insertRow };

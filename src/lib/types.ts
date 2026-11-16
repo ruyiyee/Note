@@ -1,4 +1,5 @@
-// Shared row types. Mirror supabase/migrations/0001_init.sql.
+// Shared row types. Mirror supabase/migrations/*.sql.
+// Folders: parent_id null = folder, parent_id set = notebook inside that folder.
 // Local-only fields start with "_" and are stripped before upload.
 
 export interface LocalMeta {
@@ -58,6 +59,7 @@ export interface Card extends LocalMeta {
   back: string;
   example: string;
   pronunciation: string;
+  notes: string;
   source_note_id: string | null;
   ease: number;
   interval_days: number;
@@ -65,6 +67,19 @@ export interface Card extends LocalMeta {
   lapses: number;
   due_at: string;
   last_reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+/** Standalone task (kind 'task') or calendar entry (kind 'event'). Not linked to notes. */
+export interface Item extends LocalMeta {
+  id: string;
+  user_id: string;
+  kind: 'task' | 'event';
+  title: string;
+  date: string | null; // YYYY-MM-DD
+  done: boolean;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -79,5 +94,5 @@ export interface NoteVersion {
   created_at: string;
 }
 
-export type SyncedTable = 'folders' | 'notes' | 'attachments' | 'cards';
-export const SYNCED_TABLES: SyncedTable[] = ['folders', 'notes', 'attachments', 'cards'];
+export type SyncedTable = 'folders' | 'notes' | 'attachments' | 'cards' | 'items';
+export const SYNCED_TABLES: SyncedTable[] = ['folders', 'notes', 'attachments', 'cards', 'items'];

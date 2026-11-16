@@ -40,8 +40,12 @@ export async function countPending() {
   return n;
 }
 
+// push/pull handle each table independently: a failure in one table (for example
+// a migration that has not been run yet) must not block the others.
 export async function push(remote: Remote) {
+  let firstErr: unknown;
   for (const t of SYNCED_TABLES) {
+   try {
     const table = db.table_(t);
     let dirty = await table.where('_dirty').equals(1).toArray();
     if (!dirty.length) continue;
@@ -61,11 +65,15 @@ export async function push(remote: Remote) {
         }
       });
     }
+   } catch (e) { firstErr ??= e; }
   }
+  if (firstErr) throw firstErr;
 }
 
 export async function pull(remote: Remote) {
+  let firstErr: unknown;
   for (const t of SYNCED_TABLES) {
+   try {
     const table = db.table_(t);
     const key = `cursor:${t}`;
     let cursor = (await getMeta<string>(key)) ?? null;
@@ -83,7 +91,9 @@ export async function pull(remote: Remote) {
       await setMeta(key, cursor);
       if (rows.length < 1000) break;
     }
+   } catch (e) { firstErr ??= e; }
   }
+  if (firstErr) throw firstErr;
 }
 
 let running: Promise<void> | null = null;
@@ -101,8 +111,10 @@ export function syncNow(remote: Remote): Promise<void> {
       }
       setStatus({ state: 'syncing' });
       try {
-        await push(remote);
-        await pull(remote);
+        let err: unknown;
+        try { await push(remote); } catch (e) { err = e; }
+        try { await pull(remote); } catch (e) { err ??= e; }
+        if (err) throw err;
         setStatus({ state: 'idle', error: null, lastSyncedAt: new Date().toISOString(), pending: await countPending() });
       } catch (e: any) {
         const offline = typeof navigator !== 'undefined' && navigator.onLine === false;

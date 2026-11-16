@@ -12,10 +12,10 @@ export default function SyncBadge() {
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
   let label = 'Synced', cls = 'ok';
-  if (!online || s.state === 'offline') { label = s.pending ? `Offline · ${s.pending} unsynced` : 'Offline'; cls = 'warn'; }
-  else if (s.state === 'syncing') { label = 'Syncing…'; cls = 'busy'; }
-  else if (s.state === 'error') { label = 'Sync error · retry'; cls = 'err'; }
-  else if (s.pending) { label = `Saving ${s.pending}…`; cls = 'busy'; }
+  if (!online || s.state === 'offline') { label = s.pending ? `Offline, ${s.pending} unsynced` : 'Offline'; cls = 'warn'; }
+  else if (s.state === 'syncing') { label = 'Syncing'; cls = 'busy'; }
+  else if (s.state === 'error') { label = 'Sync problem, tap to retry'; cls = 'err'; }
+  else if (s.pending) { label = 'Saving'; cls = 'busy'; }
   const title = s.error ? `Error: ${s.error}` : s.lastSyncedAt ? `Last synced ${new Date(s.lastSyncedAt).toLocaleTimeString()}` : 'Not synced yet';
   return <button className={`sync-badge ${cls}`} title={title} onClick={() => syncNow(supabaseRemote)}><span className="dot" />{label}</button>;
 }

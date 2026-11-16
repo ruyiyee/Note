@@ -7,6 +7,7 @@ import { clearLocal } from '../lib/db';
 import { deleteAllFiles } from '../lib/attachments';
 import { countPending, syncNow } from '../lib/sync';
 import { supabaseRemote } from '../lib/remote';
+import { askConfirm, askText } from './Dialog';
 
 export default function Settings({ onClose, session }: { onClose: () => void; session: Session }) {
   const [theme, setTheme] = useState<Theme>(getTheme());
@@ -15,12 +16,12 @@ export default function Settings({ onClose, session }: { onClose: () => void; se
 
   async function signOut() {
     const pending = await countPending();
-    if (pending && !confirm(`${pending} change(s) have not synced yet and will be lost if you sign out now. Sign out anyway?`)) return;
+    if (pending && !(await askConfirm(`${pending} change(s) have not synced yet and will be lost if you sign out now. Sign out anyway?`, 'Sign out'))) return;
     await clearLocal(); await supabase.auth.signOut(); location.reload();
   }
 
   async function deleteAccount() {
-    const typed = prompt('This permanently deletes your account, all notes, cards and files. Type DELETE to confirm.');
+    const typed = await askText('This permanently deletes your account, all notes, words and files. Type DELETE to confirm.', '', 'Delete');
     if (typed !== 'DELETE') return;
     try {
       setMsg('Deleting files…'); await deleteAllFiles();
@@ -33,7 +34,7 @@ export default function Settings({ onClose, session }: { onClose: () => void; se
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal settings" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Settings">
-        <header><h3>Settings</h3><button className="icon-btn" onClick={onClose}>×</button></header>
+        <header><h3>Settings</h3><button className="text-btn" onClick={onClose}>Close</button></header>
         <section>
           <h4>Appearance</h4>
           <div className="seg">{(['system', 'light', 'dark'] as Theme[]).map((t) => <button key={t} className={theme === t ? 'active' : ''} onClick={() => { setTheme(t); applyTheme(t); }}>{t[0].toUpperCase() + t.slice(1)}</button>)}</div>
@@ -59,15 +60,10 @@ export default function Settings({ onClose, session }: { onClose: () => void; se
           <h4>Keyboard shortcuts</h4>
           <table className="shortcuts"><tbody>
             <tr><td><kbd>Ctrl/⌘ Alt N</kbd></td><td>New note</td></tr>
-            <tr><td><kbd>Ctrl/⌘ Shift I</kbd></td><td>Quick capture to Inbox</td></tr>
             <tr><td><kbd>Ctrl/⌘ K</kbd></td><td>Search</td></tr>
-            <tr><td><kbd>Ctrl/⌘ \</kbd></td><td>Toggle sidebar</td></tr>
+            <tr><td><kbd>Ctrl/⌘ {'\\'}</kbd></td><td>Show or hide the sidebar</td></tr>
             <tr><td><kbd>Ctrl/⌘ S</kbd></td><td>Sync now</td></tr>
-            <tr><td><kbd>Ctrl/⌘ B / I / U</kbd></td><td>Bold / italic / underline</td></tr>
-            <tr><td><kbd>Ctrl/⌘ Shift H</kbd></td><td>Highlight</td></tr>
-            <tr><td><kbd>Ctrl/⌘ Alt 1–3</kbd></td><td>Headings</td></tr>
-            <tr><td><kbd>Ctrl/⌘ Shift 7 / 8 / 9</kbd></td><td>Numbered / bullet / checklist</td></tr>
-            <tr><td><kbd>Esc</kbd></td><td>Back to list (mobile)</td></tr>
+            <tr><td><kbd>Ctrl/⌘ B / I / U</kbd></td><td>Bold, italic, underline</td></tr>
           </tbody></table>
         </section>
         <section>

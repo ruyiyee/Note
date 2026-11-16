@@ -2,12 +2,12 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db, clearLocal } from '../src/lib/db';
 import { push, pull, syncNow, type Remote } from '../src/lib/sync';
-import { createNote, setCurrentUser, updateNote } from '../src/lib/store';
+import { createFolder, createItem, createNote, setCurrentUser, trashFolder, updateNote } from '../src/lib/store';
 import type { SyncedTable } from '../src/lib/types';
 
 /** In-memory fake of the server: assigns increasing updated_at like the DB trigger. */
 function fakeServer() {
-  const tables: Record<string, Map<string, any>> = { folders: new Map(), notes: new Map(), attachments: new Map(), cards: new Map() };
+  const tables: Record<string, Map<string, any>> = { folders: new Map(), notes: new Map(), attachments: new Map(), cards: new Map(), items: new Map() };
   let clock = Date.parse('2030-01-01T00:00:00Z');
   const remote: Remote = {
     async upsert(t: SyncedTable, rows) {
@@ -81,5 +81,32 @@ describe('sync engine', () => {
     const s = fakeServer();
     await syncNow(s.remote);
     expect(s.tables.notes.get(n.id).title).toBe('queued');
+  });
+
+  it('keeps syncing notes when another table fails (e.g. migration not run yet)', async () => {
+    const s = fakeServer();
+    const partial: Remote = {
+      upsert: (t, rows) => (t === 'items' ? Promise.reject(new Error('relation "items" does not exist')) : s.remote.upsert(t, rows)),
+      pullSince: (t, since, limit) => (t === 'items' ? Promise.reject(new Error('relation "items" does not exist')) : s.remote.pullSince(t, since, limit)),
+    };
+    const n = await createNote({ title: 'still syncs' });
+    const task = await createItem({ kind: 'task', title: 'waits' });
+    await syncNow(partial);
+    expect(s.tables.notes.get(n.id).title).toBe('still syncs');
+    expect((await db.notes.get(n.id))!._dirty).toBe(0);
+    expect((await db.items.get(task.id))!._dirty).toBe(1);
+    await syncNow(s.remote);
+    expect(s.tables.items.get(task.id).title).toBe('waits');
+  });
+
+  it('deleting a folder removes its notebooks but keeps the notes', async () => {
+    const folder = await createFolder('Uni');
+    const nb = await createFolder('Biology', folder.id);
+    const n = await createNote({ title: 'Cells', folder_id: nb.id });
+    await trashFolder(folder.id);
+    expect((await db.folders.get(nb.id))!.deleted_at).toBeTruthy();
+    const kept = (await db.notes.get(n.id))!;
+    expect(kept.deleted_at).toBeNull();
+    expect(kept.folder_id).toBeNull();
   });
 });

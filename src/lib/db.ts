@@ -2,13 +2,14 @@
 // The cloud (Supabase) is the source of truth; this is a cache that makes the
 // app fast and usable offline. Rows with _dirty=1 are waiting to be uploaded.
 import Dexie, { type Table } from 'dexie';
-import type { Attachment, Card, Folder, Note, SyncedTable } from './types';
+import type { Attachment, Card, Folder, Item, Note, SyncedTable } from './types';
 
 export class LocalDB extends Dexie {
   notes!: Table<Note, string>;
   folders!: Table<Folder, string>;
   attachments!: Table<Attachment, string>;
   cards!: Table<Card, string>;
+  items!: Table<Item, string>;
   meta!: Table<{ key: string; value: unknown }, string>;
 
   constructor() {
@@ -20,6 +21,7 @@ export class LocalDB extends Dexie {
       cards: 'id, due_at, deck, _dirty',
       meta: 'key',
     });
+    this.version(2).stores({ items: 'id, kind, date, _dirty' });
   }
 
   table_(name: SyncedTable): Table<any, string> {
@@ -37,7 +39,7 @@ export async function setMeta(key: string, value: unknown) {
 }
 
 export async function clearLocal() {
-  await db.transaction('rw', [db.notes, db.folders, db.attachments, db.cards, db.meta], async () => {
-    await Promise.all([db.notes.clear(), db.folders.clear(), db.attachments.clear(), db.cards.clear(), db.meta.clear()]);
+  await db.transaction('rw', [db.notes, db.folders, db.attachments, db.cards, db.items, db.meta], async () => {
+    await Promise.all([db.notes.clear(), db.folders.clear(), db.attachments.clear(), db.cards.clear(), db.items.clear(), db.meta.clear()]);
   });
 }

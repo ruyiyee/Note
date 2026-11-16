@@ -2,139 +2,113 @@ import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
 import { createCard, trashCard, updateCard } from '../lib/store';
-import { isDue, isLearned, review } from '../lib/srs';
+import { isDue, review } from '../lib/srs';
 import type { Card } from '../lib/types';
+import { askConfirm } from './Dialog';
 
-function speak(text: string) {
-  if (!('speechSynthesis' in window)) return alert('Speech is not supported in this browser.');
-  const u = new SpeechSynthesisUtterance(text); u.rate = 0.9;
-  speechSynthesis.cancel(); speechSynthesis.speak(u);
-}
-
-/** Optional free dictionary lookup (dictionaryapi.dev, English, no key, no cost). */
-async function lookup(word: string) {
-  const r = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word.trim())}`);
-  if (!r.ok) throw new Error('No dictionary entry found.');
-  const j = await r.json();
-  const e = j[0]; const m = e?.meanings?.[0]; const d = m?.definitions?.[0];
-  return {
-    definition: d?.definition ? `${m.partOfSpeech ? `(${m.partOfSpeech}) ` : ''}${d.definition}` : '',
-    example: d?.example ?? '',
-    pronunciation: e?.phonetic ?? e?.phonetics?.find((p: any) => p.text)?.text ?? '',
-  };
-}
+type Fields = Pick<Card, 'front' | 'back' | 'example' | 'notes'>;
+const EMPTY: Fields = { front: '', back: '', example: '', notes: '' };
 
 export default function VocabView({ onBack }: { onBack: () => void }) {
   const all = useLiveQuery(() => db.cards.toArray(), [], []);
-  const cards = useMemo(() => all.filter((c) => !c.deleted_at), [all]);
-  const decks = useMemo(() => [...new Set(cards.map((c) => c.deck))].sort(), [cards]);
-  const [deck, setDeck] = useState<string>('');
-  const [tab, setTab] = useState<'review' | 'cards' | 'add'>('review');
-  const inDeck = cards.filter((c) => !deck || c.deck === deck);
-  const due = inDeck.filter((c) => isDue(c)).sort((a, b) => a.due_at.localeCompare(b.due_at));
-  const reviewedToday = cards.filter((c) => c.last_reviewed_at?.slice(0, 10) === new Date().toISOString().slice(0, 10)).length;
+  const cards = useMemo(() => all.filter((c) => !c.deleted_at).sort((a, b) => a.front.localeCompare(b.front)), [all]);
+  const due = useMemo(() => cards.filter((c) => isDue(c)).sort((a, b) => a.due_at.localeCompare(b.due_at)), [cards]);
+  const [tab, setTab] = useState<'words' | 'review'>('words');
 
   return (
     <section className="fullpane">
       <header className="list-head">
-        <button className="icon-btn mobile-only" onClick={onBack} aria-label="Menu">☰</button>
-        <h2 className="grow">Vocabulary & review</h2>
-        <select value={deck} onChange={(e) => setDeck(e.target.value)} aria-label="Deck"><option value="">All decks</option>{decks.map((d) => <option key={d}>{d}</option>)}</select>
+        <button className="text-btn mobile-only" onClick={onBack}>Menu</button>
+        <h2 className="grow">Vocabulary</h2>
+        <span className="muted small">{cards.length} {cards.length === 1 ? 'word' : 'words'}, {due.length} to review</span>
       </header>
-      <div className="stats">
-        <div><strong>{due.length}</strong><span>due now</span></div>
-        <div><strong>{inDeck.length}</strong><span>cards</span></div>
-        <div><strong>{inDeck.filter(isLearned).length}</strong><span>learned (21d+)</span></div>
-        <div><strong>{reviewedToday}</strong><span>reviewed today</span></div>
-      </div>
       <div className="tabs">
-        {(['review', 'cards', 'add'] as const).map((t) => <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>{{ review: 'Review', cards: 'All cards', add: 'Add word' }[t]}</button>)}
+        <button className={tab === 'words' ? 'active' : ''} onClick={() => setTab('words')}>Words</button>
+        <button className={tab === 'review' ? 'active' : ''} onClick={() => setTab('review')}>Review</button>
       </div>
-      <div className="fullpane-body">
-        {tab === 'review' && <Review due={due} />}
-        {tab === 'cards' && <CardTable cards={inDeck} />}
-        {tab === 'add' && <AddCard decks={decks} defaultDeck={deck || 'Vocabulary'} />}
+      <div className="fullpane-body narrow-body">
+        {tab === 'words' ? <Words cards={cards} /> : <Review due={due} />}
       </div>
     </section>
+  );
+}
+
+function WordForm({ initial, submit, onSave, onCancel }: { initial: Fields; submit: string; onSave: (f: Fields) => void; onCancel?: () => void }) {
+  const [f, setF] = useState<Fields>(initial);
+  const set = (k: keyof Fields) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
+  return (
+    <form className="word-form" onSubmit={(e) => { e.preventDefault(); if (!f.front.trim()) return; onSave({ ...f, front: f.front.trim() }); if (!onCancel) setF(EMPTY); }}>
+      <label>Word<input value={f.front} onChange={set('front')} required /></label>
+      <label>Definition<textarea rows={2} value={f.back} onChange={set('back')} /></label>
+      <label>Example sentence<textarea rows={2} value={f.example} onChange={set('example')} /></label>
+      <label>Personal notes<textarea rows={2} value={f.notes} onChange={set('notes')} /></label>
+      <div className="row gap">
+        <button className="primary">{submit}</button>
+        {onCancel && <button type="button" className="ghost" onClick={onCancel}>Cancel</button>}
+      </div>
+    </form>
+  );
+}
+
+function Words({ cards }: { cards: Card[] }) {
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [q, setQ] = useState('');
+  const xs = cards.filter((c) => !q || `${c.front} ${c.back}`.toLowerCase().includes(q.toLowerCase()));
+  return (
+    <>
+      {adding ? (
+        <div className="word-card"><WordForm initial={EMPTY} submit="Add word" onSave={(f) => createCard({ ...f, kind: 'vocab' })} /><button className="text-btn" onClick={() => setAdding(false)}>Done</button></div>
+      ) : (
+        <div className="add-row">
+          <input className="grow" type="search" placeholder="Search words" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search words" />
+          <button className="primary" onClick={() => setAdding(true)}>Add word</button>
+        </div>
+      )}
+      <ul className="words">
+        {xs.map((c) => editing === c.id ? (
+          <li key={c.id} className="word-card">
+            <WordForm initial={c} submit="Save" onSave={(f) => { updateCard(c.id, f); setEditing(null); }} onCancel={() => setEditing(null)} />
+            <button className="text-btn danger" onClick={async () => (await askConfirm(`Delete "${c.front}"?`, 'Delete')) && trashCard(c.id)}>Delete word</button>
+          </li>
+        ) : (
+          <li key={c.id}><button className="word" onClick={() => setEditing(c.id)}>
+            <span className="word-term">{c.front}</span>
+            {c.back && <span className="word-def">{c.back}</span>}
+            {c.example && <span className="word-ex">{c.example}</span>}
+            {c.notes && <span className="word-notes">{c.notes}</span>}
+          </button></li>
+        ))}
+      </ul>
+      {!xs.length && <p className="muted empty">{cards.length ? 'No matches.' : 'No words yet. Add your first word to start.'}</p>}
+    </>
   );
 }
 
 function Review({ due }: { due: Card[] }) {
   const [show, setShow] = useState(false);
   const c = due[0];
-  if (!c) return <div className="center muted pad"><p>Nothing due. Nice work.</p><p className="small">Add words, or open a note and use 🎓 Study to make flashcards.</p></div>;
+  if (!c) return <p className="muted empty">Nothing to review right now. Words come back here when they are due.</p>;
   const grade = (g: 0 | 1 | 2 | 3) => { updateCard(c.id, review(c, g)); setShow(false); };
   return (
     <div className="flashcard-wrap">
-      <div className="flashcard" onClick={() => setShow(true)}>
-        <div className="muted small">{c.deck}</div>
+      <div className="flashcard">
         <div className="front">{c.front}</div>
-        {c.pronunciation && <div className="muted">{c.pronunciation}</div>}
-        {c.kind === 'vocab' && <button className="ghost small" onClick={(e) => { e.stopPropagation(); speak(c.front); }}>🔊 Pronounce</button>}
-        {show ? <>
-          <hr /><div className="back">{c.back}</div>
-          {c.example && <div className="example">“{c.example}”</div>}
-        </> : <p className="muted small">Tap or press Show to reveal</p>}
+        {show && <>
+          {c.back && <div className="back">{c.back}</div>}
+          {c.example && <div className="example">{c.example}</div>}
+          {c.notes && <div className="muted">{c.notes}</div>}
+        </>}
       </div>
       {!show ? <button className="primary" onClick={() => setShow(true)}>Show answer</button> : (
         <div className="grades">
-          <button onClick={() => grade(0)} className="g0">Again<small>10 min</small></button>
-          <button onClick={() => grade(1)} className="g1">Hard</button>
-          <button onClick={() => grade(2)} className="g2">Good</button>
-          <button onClick={() => grade(3)} className="g3">Easy</button>
+          <button onClick={() => grade(0)}>Again</button>
+          <button onClick={() => grade(1)}>Hard</button>
+          <button onClick={() => grade(2)}>Good</button>
+          <button onClick={() => grade(3)}>Easy</button>
         </div>
       )}
-      <p className="muted small">{due.length} left in this session</p>
+      <p className="muted small">{due.length} left</p>
     </div>
-  );
-}
-
-function CardTable({ cards }: { cards: Card[] }) {
-  const [q, setQ] = useState('');
-  const xs = cards.filter((c) => !q || `${c.front} ${c.back}`.toLowerCase().includes(q.toLowerCase())).sort((a, b) => a.front.localeCompare(b.front));
-  return (
-    <div>
-      <input type="search" placeholder="Filter cards" value={q} onChange={(e) => setQ(e.target.value)} className="block-input" />
-      <table className="cards-table">
-        <thead><tr><th>Front</th><th>Back</th><th>Next review</th><th /></tr></thead>
-        <tbody>{xs.map((c) => (
-          <tr key={c.id}>
-            <td contentEditable suppressContentEditableWarning onBlur={(e) => e.currentTarget.textContent !== c.front && updateCard(c.id, { front: e.currentTarget.textContent ?? '' })}>{c.front}</td>
-            <td contentEditable suppressContentEditableWarning onBlur={(e) => e.currentTarget.textContent !== c.back && updateCard(c.id, { back: e.currentTarget.textContent ?? '' })}>{c.back}</td>
-            <td className="muted small">{isDue(c) ? 'due' : new Date(c.due_at).toLocaleDateString()}</td>
-            <td><button className="icon-btn" title="Delete card" onClick={() => confirm(`Delete “${c.front}”?`) && trashCard(c.id)}>×</button></td>
-          </tr>
-        ))}</tbody>
-      </table>
-      {!xs.length && <p className="muted pad">No cards.</p>}
-    </div>
-  );
-}
-
-function AddCard({ decks, defaultDeck }: { decks: string[]; defaultDeck: string }) {
-  const empty = { front: '', back: '', example: '', pronunciation: '', deck: defaultDeck };
-  const [f, setF] = useState(empty);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
-  return (
-    <form className="add-card" onSubmit={async (e) => { e.preventDefault(); if (!f.front.trim()) return; await createCard({ ...f, kind: 'vocab' }); setF({ ...empty, deck: f.deck }); setMsg(`Added “${f.front}”.`); }}>
-      <label>Word or phrase<input value={f.front} onChange={set('front')} required autoFocus /></label>
-      <div className="row gap">
-        <button type="button" className="ghost small" disabled={!f.front || busy} onClick={async () => {
-          setBusy(true); setMsg(null);
-          try { const r = await lookup(f.front); setF((x) => ({ ...x, back: x.back || r.definition, example: x.example || r.example, pronunciation: x.pronunciation || r.pronunciation })); }
-          catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
-        }}>{busy ? 'Looking up…' : '📖 Look up (English, free dictionary)'}</button>
-        <button type="button" className="ghost small" disabled={!f.front} onClick={() => speak(f.front)}>🔊 Listen</button>
-      </div>
-      <label>Definition<textarea rows={2} value={f.back} onChange={set('back')} /></label>
-      <label>Example sentence<textarea rows={2} value={f.example} onChange={set('example')} /></label>
-      <label>Pronunciation (IPA)<input value={f.pronunciation} onChange={set('pronunciation')} /></label>
-      <label>Deck<input list="decks" value={f.deck} onChange={set('deck')} /></label>
-      <datalist id="decks">{decks.map((d) => <option key={d} value={d} />)}</datalist>
-      <button className="primary">Add card</button>
-      {msg && <p className="muted small">{msg}</p>}
-    </form>
   );
 }

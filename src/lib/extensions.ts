@@ -1,12 +1,16 @@
-// TipTap extension set shared by the editor, template conversion and export.
+// TipTap extension set shared by the editor and PDF export.
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import { TableKit } from '@tiptap/extension-table';
 import Image from '@tiptap/extension-image';
 import { Placeholder } from '@tiptap/extensions';
-import { generateHTML, generateJSON } from '@tiptap/core';
+import { generateHTML } from '@tiptap/core';
 import { signedUrl } from './attachments';
+import { Drawing } from './drawing';
+
+/** The four highlight colours offered in the toolbar. */
+export const HIGHLIGHTS = ['#ffe9ef', '#ffd3df', '#fbbccd', '#f4a6bd'];
 
 /** Image node that stores a private storage path and resolves a signed URL when shown. */
 export const StoredImage = Image.extend({
@@ -32,20 +36,20 @@ export const StoredImage = Image.extend({
 
 export function baseExtensions() {
   return [
-    StarterKit.configure({ link: { openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' } } }),
-    Highlight.configure({ multicolor: false }),
+    StarterKit.configure({ link: false }), // hyperlinks are intentionally disabled
+    Highlight.configure({ multicolor: true }),
     TaskList,
     TaskItem.configure({ nested: true }),
     TableKit.configure({ table: { resizable: false } }),
     StoredImage,
+    Drawing,
   ];
 }
 
 export function editorExtensions() {
-  return [...baseExtensions(), Placeholder.configure({ placeholder: 'Start writing… (type [[ to link a note)' })];
+  return [...baseExtensions(), Placeholder.configure({ placeholder: 'Start writing' })];
 }
 
-export const htmlToDoc = (html: string) => generateJSON(html, baseExtensions());
 export function docToHtml(doc: unknown): string {
   try { return generateHTML(doc as any, baseExtensions()); } catch { return ''; }
 }

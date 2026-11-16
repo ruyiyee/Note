@@ -1,46 +1,52 @@
 import { useMemo, useState } from 'react';
-import type { Note } from '../lib/types';
-import { extractTasks, toggleTask } from '../lib/text';
-import { saveNoteContent } from '../lib/store';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../lib/db';
+import { createItem, trashItem, updateItem } from '../lib/store';
+import type { Item } from '../lib/types';
 
-// Tasks are checklist items inside notes. "@2026-12-01" or "due: 2026-12-01" sets a deadline.
-export default function TasksView({ notes, onOpen, onBack }: { notes: Note[]; onOpen: (id: string) => void; onBack: () => void }) {
-  const [showDone, setShowDone] = useState(false);
-  const tasks = useMemo(() => notes.filter((n) => !n.deleted_at && !n.archived)
-    .flatMap((n) => extractTasks(n.content).map((t) => ({ ...t, note: n }))), [notes]);
-  const today = new Date().toISOString().slice(0, 10);
-  const open = tasks.filter((t) => showDone || !t.checked)
-    .sort((a, b) => (a.due ?? '9999').localeCompare(b.due ?? '9999') || a.note.title.localeCompare(b.note.title));
-  const groups: [string, typeof open][] = [
-    ['Overdue', open.filter((t) => t.due && t.due < today && !t.checked)],
-    ['Today', open.filter((t) => t.due === today)],
-    ['Upcoming', open.filter((t) => t.due && t.due > today)],
-    ['No deadline', open.filter((t) => !t.due)],
-    ['Done', showDone ? open.filter((t) => t.checked && t.due && t.due < today) : []],
-  ];
+const fmt = (d: string) => new Date(d + 'T00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+// A simple standalone task list. Tasks are not linked to notes.
+export default function TasksView({ onBack }: { onBack: () => void }) {
+  const all = useLiveQuery(() => db.items.where('kind').equals('task').toArray(), [], []);
+  const [title, setTitle] = useState('');
+  const [date, setDate] = useState('');
+  const today = new Date().toLocaleDateString('en-CA');
+  const { open, done } = useMemo(() => {
+    const live = all.filter((t) => !t.deleted_at);
+    return {
+      open: live.filter((t) => !t.done).sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999') || a.created_at.localeCompare(b.created_at)),
+      done: live.filter((t) => t.done).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+    };
+  }, [all]);
+
+  const Row = ({ t }: { t: Item }) => (
+    <li className={`task ${t.done ? 'done' : ''}`}>
+      <input type="checkbox" checked={t.done} onChange={() => updateItem(t.id, { done: !t.done })} aria-label={t.done ? 'Mark as not done' : 'Mark as done'} />
+      <span className="grow">{t.title}</span>
+      {t.date && <span className={`due ${!t.done && t.date < today ? 'late' : ''}`}>{fmt(t.date)}</span>}
+      <button className="text-btn row-action" onClick={() => trashItem(t.id)}>Remove</button>
+    </li>
+  );
+
   return (
     <section className="fullpane">
       <header className="list-head">
-        <button className="icon-btn mobile-only" onClick={onBack} aria-label="Menu">☰</button>
+        <button className="text-btn mobile-only" onClick={onBack}>Menu</button>
         <h2 className="grow">Tasks</h2>
-        <label className="small"><input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} /> Show done</label>
       </header>
-      <div className="fullpane-body">
-        <p className="muted small">Every checklist item in your notes appears here. Add a deadline by writing <code>@2026-12-01</code> in the item.</p>
-        {groups.map(([name, xs]) => xs.length > 0 && (
-          <div key={name} className="task-group">
-            <h4 className={name === 'Overdue' ? 'error' : ''}>{name}</h4>
-            {xs.map((t) => (
-              <div key={`${t.note.id}-${t.index}`} className={`task ${t.checked ? 'done' : ''}`}>
-                <input type="checkbox" checked={t.checked} onChange={() => saveNoteContent(t.note.id, toggleTask(t.note.content, t.index))} />
-                <span className="grow">{t.text || '(empty task)'}</span>
-                {t.due && <span className="due small">{new Date(t.due + 'T00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>}
-                <button className="link small" onClick={() => onOpen(t.note.id)}>{t.note.title || 'Untitled'}</button>
-              </div>
-            ))}
-          </div>
-        ))}
-        {!open.length && <p className="muted pad">No tasks. Add a checklist (☑) to any note.</p>}
+      <div className="fullpane-body narrow-body">
+        <form className="add-row" onSubmit={async (e) => { e.preventDefault(); if (!title.trim()) return; await createItem({ kind: 'task', title: title.trim(), date: date || null }); setTitle(''); setDate(''); }}>
+          <input className="grow" placeholder="Add a task" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="New task" />
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Due date (optional)" />
+          <button className="primary">Add</button>
+        </form>
+        <ul className="tasks">{open.map((t) => <Row key={t.id} t={t} />)}</ul>
+        {!open.length && <p className="muted empty">Nothing to do.</p>}
+        {done.length > 0 && <>
+          <h4>Completed</h4>
+          <ul className="tasks">{done.map((t) => <Row key={t.id} t={t} />)}</ul>
+        </>}
       </div>
     </section>
   );

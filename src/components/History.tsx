@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Note, NoteVersion } from '../lib/types';
+import { askConfirm } from './Dialog';
 
 // Versions are snapshotted server-side (trigger) at most every 10 minutes while a note changes.
 export default function History({ note, onClose, onRestore }: { note: Note; onClose: () => void; onRestore: (content: unknown, title: string) => void }) {
@@ -13,7 +14,7 @@ export default function History({ note, onClose, onRestore }: { note: Note; onCl
   }, [note.id]);
   return (
     <aside className="side-panel">
-      <header><h3>Version history</h3><button className="icon-btn" onClick={onClose}>×</button></header>
+      <header><h3>Version history</h3><button className="text-btn" onClick={onClose}>Close</button></header>
       <p className="muted small">A snapshot is kept at most every 10 minutes while you edit.</p>
       {err && <p className="error">{err}</p>}
       {versions?.length === 0 && <p className="muted small">No earlier versions yet.</p>}
@@ -25,7 +26,7 @@ export default function History({ note, onClose, onRestore }: { note: Note; onCl
       {sel && (
         <div className="version-preview">
           <pre>{sel.content_text.slice(0, 2000) || '(empty)'}</pre>
-          <button className="primary" onClick={() => confirm('Restore this version? The current text will itself be kept in history.') && onRestore(sel.content, sel.title)}>Restore this version</button>
+          <button className="primary" onClick={async () => (await askConfirm('Restore this version? The current text is kept in history too.', 'Restore')) && onRestore(sel.content, sel.title)}>Restore this version</button>
         </div>
       )}
     </aside>

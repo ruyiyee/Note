@@ -1,115 +1,129 @@
 import { useMemo } from 'react';
 import type { Folder, Note } from '../lib/types';
 import type { Sort, View } from './Workspace';
-import { parseQuery, scoreText, snippet } from '../lib/text';
-import { restoreNote } from '../lib/store';
+import { parseTerms, scoreText, snippet } from '../lib/text';
+import { createFolder, restoreNote, trashFolder, updateFolder } from '../lib/store';
+import { printNotes } from '../lib/export';
 import { db } from '../lib/db';
 import { supabase } from '../lib/supabase';
+import { askConfirm, askText } from './Dialog';
 
 interface Props {
-  view: View; notes: Note[]; folders: Folder[]; query: string; onQuery: (q: string) => void; sort: Sort; onSort: (s: Sort) => void;
+  view: View; onView: (v: View) => void; notes: Note[]; folders: Folder[]; query: string; onQuery: (q: string) => void; sort: Sort; onSort: (s: Sort) => void;
   selectedId: string | null; onOpen: (id: string) => void; onNew: () => void; onBack: () => void;
 }
 
-export function viewTitle(view: View, folders: Folder[]) {
-  switch (view.kind) {
-    case 'folder': return folders.find((f) => f.id === view.id)?.name ?? 'Folder';
-    case 'tag': return `#${view.tag}`;
-    case 'day': return new Date(view.date + 'T00:00').toLocaleDateString(undefined, { dateStyle: 'full' });
-    default: return ({ inbox: 'Inbox', all: 'All notes', recent: 'Recent', favorites: 'Favourites', archive: 'Archive', trash: 'Trash' } as any)[view.kind] ?? '';
-  }
-}
+const TITLES: Record<string, string> = { all: 'All Notes', favorites: 'Favourites', trash: 'Trash' };
 
-function descendants(folders: Folder[], id: string): Set<string> {
-  const out = new Set([id]); let grew = true;
-  while (grew) { grew = false; for (const f of folders) if (f.parent_id && out.has(f.parent_id) && !out.has(f.id)) { out.add(f.id); grew = true; } }
-  return out;
-}
+export default function NoteList({ view, onView, notes, folders, query, onQuery, sort, onSort, selectedId, onOpen, onNew, onBack }: Props) {
+  const terms = useMemo(() => parseTerms(query), [query]);
+  const searching = terms.length > 0;
+  const here = view.kind === 'folder' || view.kind === 'notebook' ? folders.find((f) => f.id === view.id) : undefined;
+  const parent = here?.parent_id ? folders.find((f) => f.id === here.parent_id) : undefined;
+  const notebooks = view.kind === 'folder' ? folders.filter((f) => f.parent_id === view.id).sort((a, b) => a.name.localeCompare(b.name)) : [];
 
-export default function NoteList({ view, notes, folders, query, onQuery, sort, onSort, selectedId, onOpen, onNew, onBack }: Props) {
-  const pq = useMemo(() => parseQuery(query), [query]);
-  const searching = query.trim().length > 0;
+  const cmp = (a: Note, b: Note) => sort === 'title' ? (a.title || 'Untitled').localeCompare(b.title || 'Untitled') : sort === 'created' ? b.created_at.localeCompare(a.created_at) : b.updated_at.localeCompare(a.updated_at);
 
   const list = useMemo(() => {
-    let xs = notes;
-    if (view.kind === 'trash') xs = xs.filter((n) => n.deleted_at);
-    else {
-      xs = xs.filter((n) => !n.deleted_at);
-      if (view.kind === 'archive') xs = xs.filter((n) => n.archived);
-      else if (!searching || !pq.is.includes('archived')) xs = xs.filter((n) => !n.archived);
-    }
+    let xs = view.kind === 'trash' ? notes.filter((n) => n.deleted_at) : notes.filter((n) => !n.deleted_at);
     if (!searching) {
-      if (view.kind === 'inbox') xs = xs.filter((n) => n.inbox);
       if (view.kind === 'favorites') xs = xs.filter((n) => n.favorite);
-      if (view.kind === 'folder') { const ids = descendants(folders, view.id); xs = xs.filter((n) => n.folder_id && ids.has(n.folder_id)); }
-      if (view.kind === 'tag') xs = xs.filter((n) => n.tags.includes(view.tag));
-      if (view.kind === 'day') xs = xs.filter((n) => n.created_at.slice(0, 10) === view.date || n.updated_at.slice(0, 10) === view.date);
+      if (view.kind === 'folder' || view.kind === 'notebook') xs = xs.filter((n) => n.folder_id === view.id);
     }
-    // search filters (global across all notes)
-    if (pq.tags.length) xs = xs.filter((n) => pq.tags.every((t) => n.tags.some((nt) => nt.toLowerCase().includes(t))));
-    if (pq.folder) { const fs = folders.filter((f) => f.name.toLowerCase().includes(pq.folder!)); const ids = new Set(fs.flatMap((f) => [...descendants(folders, f.id)])); xs = xs.filter((n) => n.folder_id && ids.has(n.folder_id)); }
-    if (pq.is.includes('pinned')) xs = xs.filter((n) => n.pinned);
-    if (pq.is.includes('favorite') || pq.is.includes('favourite')) xs = xs.filter((n) => n.favorite);
-    if (pq.is.includes('task')) xs = xs.filter((n) => n.content_text && JSON.stringify(n.content).includes('"taskItem"'));
-    let scored = xs.map((n) => ({ n, s: scoreText(n.title, n.content_text, pq.terms) })).filter((x) => x.s > 0);
-    const cmp = (a: Note, b: Note) => sort === 'title' ? (a.title || 'Untitled').localeCompare(b.title || 'Untitled') : sort === 'created' ? b.created_at.localeCompare(a.created_at) : b.updated_at.localeCompare(a.updated_at);
-    scored.sort((a, b) => (pq.terms.length && b.s !== a.s ? b.s - a.s : 0) || (view.kind !== 'trash' && +b.n.pinned - +a.n.pinned) || cmp(a.n, b.n));
-    if (view.kind === 'recent' && !searching) scored = scored.slice(0, 30);
-    return scored.map((x) => x.n);
-  }, [notes, folders, view, pq, sort, searching]);
+    return xs.map((n) => ({ n, s: scoreText(n.title, n.content_text, terms) })).filter((x) => x.s > 0)
+      .sort((a, b) => (searching && b.s !== a.s ? b.s - a.s : 0) || cmp(a.n, b.n)).map((x) => x.n);
+  }, [notes, view, terms, sort, searching]);
 
-  const folderName = (id: string | null) => (id ? folders.find((f) => f.id === id)?.name : null);
+  const where = (id: string | null) => {
+    const f = id ? folders.find((x) => x.id === id) : null; if (!f) return null;
+    const p = f.parent_id ? folders.find((x) => x.id === f.parent_id) : null;
+    return p ? `${p.name} / ${f.name}` : f.name;
+  };
 
   async function emptyTrash() {
-    if (!confirm('Permanently delete everything in Trash? This cannot be undone.')) return;
+    if (!(await askConfirm('Permanently delete everything in Trash? This cannot be undone.', 'Delete'))) return;
     const ids = notes.filter((n) => n.deleted_at).map((n) => n.id);
     const { error } = await supabase.from('notes').delete().in('id', ids);
-    if (error) return alert('Could not empty trash: ' + error.message);
+    if (error) return alert('Could not empty Trash: ' + error.message);
     await db.notes.bulkDelete(ids);
   }
+  async function rename() { if (!here) return; const name = await askText('Rename', here.name); if (name) updateFolder(here.id, { name }); }
+  async function remove() {
+    if (!here) return;
+    const what = view.kind === 'folder' ? 'folder and its notebooks' : 'notebook';
+    if (!(await askConfirm(`Delete this ${what}? The notes inside are kept and stay in All Notes.`, 'Delete'))) return;
+    await trashFolder(here.id);
+    onView(parent ? { kind: 'folder', id: parent.id } : { kind: 'all' });
+  }
+  async function newNotebook() {
+    const name = await askText('New notebook', '', 'Create');
+    if (name && here) { const nb = await createFolder(name, here.id); onView({ kind: 'notebook', id: nb.id }); }
+  }
+
+  const canNew = !searching && (view.kind === 'all' || view.kind === 'favorites' || view.kind === 'notebook');
 
   return (
     <section className="list">
       <header className="list-head">
-        <button className="icon-btn mobile-only" onClick={onBack} aria-label="Menu">☰</button>
-        <h2 className="grow">{searching ? 'Search' : viewTitle(view, folders)}</h2>
-        {view.kind === 'trash' ? (notes.some((n) => n.deleted_at) && <button className="ghost small danger" onClick={emptyTrash}>Empty</button>)
-          : <button className="icon-btn" onClick={onNew} title="New note (Ctrl/⌘ Alt N)">＋</button>}
+        <button className="text-btn mobile-only" onClick={onBack}>Menu</button>
+        <div className="grow">
+          {parent && !searching && <button className="crumb" onClick={() => onView({ kind: 'folder', id: parent.id })}>{parent.name}</button>}
+          <h2>{searching ? 'Search' : here?.name ?? TITLES[view.kind]}</h2>
+        </div>
+        {canNew && <button className="primary small" onClick={onNew}>New note</button>}
+        {!searching && view.kind === 'folder' && <button className="primary small" onClick={newNotebook}>New notebook</button>}
+        {view.kind === 'trash' && notes.some((n) => n.deleted_at) && <button className="text-btn danger" onClick={emptyTrash}>Empty</button>}
       </header>
+      {here && !searching && (
+        <div className="list-actions">
+          {view.kind === 'notebook' && list.length > 0 && <button className="text-btn" onClick={() => printNotes(here.name, [...list].sort((a, b) => a.created_at.localeCompare(b.created_at)))}>Export PDF</button>}
+          <button className="text-btn" onClick={rename}>Rename</button>
+          <button className="text-btn" onClick={remove}>Delete</button>
+        </div>
+      )}
       <div className="search">
-        <input type="search" placeholder="Search…  (tag:x folder:y is:pinned)" value={query} onChange={(e) => onQuery(e.target.value)} aria-label="Search notes" />
+        <input type="search" placeholder="Search all notes" value={query} onChange={(e) => onQuery(e.target.value)} aria-label="Search all notes" />
       </div>
-      <div className="list-tools">
-        <span className="muted small">{list.length} note{list.length === 1 ? '' : 's'}</span>
-        <select value={sort} onChange={(e) => onSort(e.target.value as Sort)} aria-label="Sort">
-          <option value="updated">Last edited</option><option value="created">Created</option><option value="title">Title</option>
-        </select>
+      <div className="list-scroll">
+        {!searching && view.kind === 'folder' && (
+          <ul className="notebooks">
+            {notebooks.map((nb) => (
+              <li key={nb.id}><button onClick={() => onView({ kind: 'notebook', id: nb.id })}>
+                <span className="grow">{nb.name}</span>
+                <span className="muted small">{notes.filter((n) => n.folder_id === nb.id && !n.deleted_at).length} notes</span>
+              </button></li>
+            ))}
+            {!notebooks.length && <li className="muted empty">This folder has no notebooks yet. Create one to start adding notes.</li>}
+          </ul>
+        )}
+        {(list.length > 0 || view.kind !== 'folder') && (
+          <div className="list-tools">
+            <span className="muted small">{list.length} {list.length === 1 ? 'note' : 'notes'}</span>
+            <select value={sort} onChange={(e) => onSort(e.target.value as Sort)} aria-label="Sort notes">
+              <option value="updated">Last edited</option><option value="created">Created</option><option value="title">Title</option>
+            </select>
+          </div>
+        )}
+        <ul className="notes">
+          {list.map((n) => (
+            <li key={n.id} className={n.id === selectedId ? 'active' : ''} draggable onDragStart={(e) => e.dataTransfer.setData('text/note-id', n.id)}>
+              <button className="note-item" onClick={() => onOpen(n.id)}>
+                <div className="note-item-title">{n.title || 'Untitled'}</div>
+                <div className="note-item-snippet">
+                  {snippet(n.content_text, terms, 120).map(([t, hit], i) => hit ? <mark key={i}>{t}</mark> : <span key={i}>{t}</span>)}
+                </div>
+                <div className="note-item-meta">
+                  <span>{new Date(sort === 'created' ? n.created_at : n.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  {(searching || view.kind === 'all' || view.kind === 'favorites') && where(n.folder_id) && <span>{where(n.folder_id)}</span>}
+                  {n._dirty === 1 && <span className="unsynced">Not synced yet</span>}
+                </div>
+              </button>
+              {view.kind === 'trash' && <button className="text-btn restore" onClick={() => restoreNote(n.id)}>Restore</button>}
+            </li>
+          ))}
+          {!list.length && view.kind !== 'folder' && <li className="muted empty">{searching ? 'No matches.' : view.kind === 'trash' ? 'Trash is empty.' : 'No notes here yet.'}</li>}
+        </ul>
       </div>
-      {view.kind === 'trash' && <p className="muted small pad">Deleted notes stay here until you delete them permanently.</p>}
-      <ul className="notes">
-        {list.map((n) => (
-          <li key={n.id} className={n.id === selectedId ? 'active' : ''} draggable onDragStart={(e) => e.dataTransfer.setData('text/note-id', n.id)}>
-            <button className="note-item" onClick={() => onOpen(n.id)}>
-              <div className="note-item-title">
-                {n.pinned && <span className="pin" title="Pinned">📌</span>}
-                {n.favorite && <span className="fav" title="Favourite">★</span>}
-                <span>{n.title || 'Untitled'}</span>
-              </div>
-              <div className="note-item-snippet">
-                {snippet(n.content_text, pq.terms, 120).map(([t, hit], i) => hit ? <mark key={i}>{t}</mark> : <span key={i}>{t}</span>)}
-              </div>
-              <div className="note-item-meta">
-                <span>{new Date(sort === 'created' ? n.created_at : n.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                {folderName(n.folder_id) && <span>· {folderName(n.folder_id)}</span>}
-                {n.tags.slice(0, 3).map((t) => <span key={t} className="tag">#{t}</span>)}
-                {n._dirty === 1 && <span className="unsynced" title="Not yet synced">•</span>}
-              </div>
-            </button>
-            {view.kind === 'trash' && <button className="ghost small restore" onClick={() => restoreNote(n.id)}>Restore</button>}
-          </li>
-        ))}
-        {!list.length && <li className="muted pad">{searching ? 'No matches.' : 'No notes here yet.'}</li>}
-      </ul>
     </section>
   );
 }
