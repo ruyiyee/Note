@@ -2,7 +2,7 @@
 
 A personal, cloud-synced note-taking app. It runs in the browser and installs as a PWA on desktop and mobile. Your data lives in **your own Supabase project** (Postgres, Auth and Storage) and is cached on each device for offline use. The app has no dependency on Claude or any paid AI service.
 
-- **Live URL:** `https://ruyiyee.github.io/note/` (GitHub Pages, deployed by `.github/workflows/deploy.yml`)
+- **Live URL:** `https://ruyiyee.github.io/Note/` (GitHub Pages, deployed by `.github/workflows/deploy.yml`)
 - **Cost:** $0 on the free tiers of GitHub Pages and Supabase. The limits are listed below.
 
 ## Architecture
@@ -91,7 +91,7 @@ There is no custom backend. The client talks to Supabase directly:
 
 ## Setup from scratch
 1. **Supabase:** create a free project. In the **SQL Editor**, paste and run `supabase/migrations/0001_init.sql`. The script is safe to re-run.
-2. **Auth URLs:** in Supabase go to Authentication → URL Configuration. Set **Site URL** to the deployed URL (e.g. `https://ruyiyee.github.io/note/`) and add it under **Redirect URLs**. Add `http://localhost:5173/` too for local development. Confirmation and magic-link emails use these URLs.
+2. **Auth URLs:** in Supabase go to Authentication → URL Configuration. Set **Site URL** to the deployed URL (e.g. `https://ruyiyee.github.io/Note/`) and add it under **Redirect URLs**. Add `http://localhost:5173/` too for local development. Confirmation and magic-link emails use these URLs.
 3. Put the project URL and anon key in `.env.production`. For local development, also copy them to `.env.local`.
 4. **GitHub Pages:** go to repo Settings → Pages → Build and deployment → Source: **GitHub Actions**. Pushing to `main` then deploys.
 5. **Local development:** `npm install && npm run dev`. Tests: `npm test`. Type check and production build: `npm run build`.
