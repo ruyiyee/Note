@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import WordCount from './WordCount';
 import { EditorContent, useEditor, type Editor as TEditor } from '@tiptap/react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { Folder, Note } from '../lib/types';
@@ -176,6 +177,7 @@ export default function Editor({ note, folders, onBack, onClose, onOpen, wide, o
           </aside>
         )}
       </div>
+      {editor && <WordCount editor={editor} />}
     </main>
   );
 }

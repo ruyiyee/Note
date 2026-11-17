@@ -27,3 +27,10 @@ describe('text utils', () => {
     const again = review({ ...base, ...r2 } as any, 0); expect(again.reps).toBe(0); expect(again.lapses).toBe(1);
   });
 });
+
+import { countWords } from '../src/lib/text';
+describe('countWords', () => {
+  it('counts English words, keeping contractions and hyphens together', () => expect(countWords("It's a well-known fact, isn't it? 42")).toBe(7));
+  it('counts each Chinese character as a word', () => expect(countWords('我爱 notes')).toBe(3));
+  it('is zero for empty or punctuation-only text', () => { expect(countWords('')).toBe(0); expect(countWords(' — ... ')).toBe(0); });
+});

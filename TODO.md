@@ -10,6 +10,7 @@ _Last updated: 2026-11-16 (navy and pink theme, drawing tools, pages)_
 - [x] Folders → notebooks → notes; rename/delete; move a note via the notebook selector or drag onto a notebook
 - [x] Notes: create, edit, autosave, duplicate, favourite, Trash → restore / empty, global search with highlighted matches, sort
 - [x] Editor: text styles, bold/italic/underline, four pink highlights, bullets, numbers, checklist, table, freehand drawing, image/PDF attachments; hyperlinks disabled
+- [x] Word count under the note (total, or "N of M words selected" while text is selected; CJK characters count as one word each)
 - [x] Summary panel (local algorithm) and version history with restore
 - [x] PDF export of a note or a notebook (browser print dialog); JSON + Markdown export of everything
 - [x] Tasks: standalone list with optional due date
@@ -25,7 +26,7 @@ _Last updated: 2026-11-16 (navy and pink theme, drawing tools, pages)_
 - [x] GitHub Pages deploy workflow + daily Supabase keep-alive workflow
 
 ## Verified
-- [x] `npm test`: 23 unit tests (incl. 30-minute snapshot interval) (incl. eraser splitting, eraser size, lasso, move/resize, legacy stroke conversion, page count) + (sync engine incl. offline queue, edit-during-upload, one-table-failure isolation, folder deletion keeps notes; search; summary; SM-2)
+- [x] `npm test`: 26 unit tests (incl. 30-minute snapshot interval, word count) (incl. eraser splitting, eraser size, lasso, move/resize, legacy stroke conversion, page count) + (sync engine incl. offline queue, edit-during-upload, one-table-failure isolation, folder deletion keeps notes; search; summary; SM-2)
 - [x] `node tests/e2e/smoke.cjs` against a simulated Supabase API: folder → notebook → note, highlight + drawing saved, links not created, summary panel, PDF export content (note + notebook), search, tasks, calendar entry, vocabulary add + review, phone-sized second device receives note and drawing, no horizontal overflow, offline edit syncs on reconnect, reload persistence, no console errors
 - [x] `node tests/e2e/drawing.cjs`: draw, partial erase with unchanged stroke width, undo/redo of erase, lasso move + delete + undo, zoom, three pages + go to page 3, full width (878px → 1440px), autosave to server, strokes and pages intact after reload, PDF content
 - [x] Live checks on the real project (2026-11-16): site loads, service worker active, anon cannot read or insert rows, anon cannot call `delete_my_account`, storage bucket not public

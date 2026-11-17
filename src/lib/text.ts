@@ -77,3 +77,12 @@ export function summarize(text: string, maxSentences = 3): string[] {
   });
   return scored.sort((a, b) => b.sc - a.sc).slice(0, maxSentences).sort((a, b) => a.i - b.i).map((x) => x.s);
 }
+
+// Word count. Chinese/Japanese/Korean characters count one word each (they have no spaces);
+// everything else is counted by runs of letters/digits, so "don't" and "e-mail" are one word.
+const CJK = /[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯]/gu;
+export function countWords(text: string): number {
+  const cjk = text.match(CJK)?.length ?? 0;
+  const rest = text.replace(CJK, ' ').match(/[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu)?.length ?? 0;
+  return cjk + rest;
+}
