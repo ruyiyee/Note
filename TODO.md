@@ -20,6 +20,7 @@ _Last updated: 2026-11-16 (navy and pink theme, drawing tools, pages)_
 - [x] Pages within a note (dashed "Page N" separators, go-to-page box, one page per sheet in PDF)
 - [x] Close button and "Open a note" empty state (also after moving a note to Trash); spelling/grammar check toggle in Settings
 - [x] Automatic photo shrinking before upload (tested in Chromium: 8.6 MB 4032×3024 photo → 0.66 MB 2000×1500)
+- [x] Fixed: cursor jumped to the empty line below a list after leaving and returning to the tab (own saved content coming back from the server with re-ordered JSON keys reset the editor). Now compared order-insensitively, and real remote changes keep the cursor position. Test: tests/e2e/cursor-after-return.cjs
 - [x] Account deletion; responsive phone layout; installable PWA; offline app shell
 - [x] GitHub Pages deploy workflow + daily Supabase keep-alive workflow
 

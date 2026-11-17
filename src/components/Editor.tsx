@@ -78,8 +78,15 @@ export default function Editor({ note, folders, onBack, onClose, onOpen, wide, o
   // Apply changes that arrived from another device (only when not actively editing).
   useEffect(() => {
     if (!editor || note._dirty === 1 || pendingDoc.current || editor.isFocused) return;
-    if (JSON.stringify(editor.getJSON()) !== JSON.stringify(note.content)) editor.commands.setContent((note.content as any) ?? '', { emitUpdate: false });
     if (document.activeElement?.className !== 'note-title') setTitle(note.title);
+    // Compare ignoring key order (the database returns JSON keys sorted), so our own
+    // saved content coming back from the server never resets the editor.
+    if (sameJSON(editor.getJSON(), note.content)) return;
+    // A real change from another device: apply it but keep the cursor where it was.
+    const { from, to } = editor.state.selection;
+    editor.commands.setContent((note.content as any) ?? '', { emitUpdate: false });
+    const max = editor.state.doc.content.size;
+    try { editor.commands.setTextSelection({ from: Math.min(from, max), to: Math.min(to, max) }); } catch { /* ignore */ }
   }, [note.updated_at]);
 
   const titleTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -181,6 +188,12 @@ function PageJump({ pages, onGo }: { pages: number; onGo: (n: number) => void })
       <input id="page-jump" inputMode="numeric" placeholder={`1–${pages}`} value={v} onChange={(e) => setV(e.target.value.replace(/\D/g, ''))} aria-label={`Go to page, 1 to ${pages}`} />
     </form>
   );
+}
+
+/** Deep equality for JSON values, ignoring object key order. */
+function sameJSON(a: unknown, b: unknown): boolean {
+  const canon = (v: any): any => Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.keys(v).sort().reduce((o: any, k) => { if (v[k] !== undefined) o[k] = canon(v[k]); return o; }, {}) : v;
+  return JSON.stringify(canon(a)) === JSON.stringify(canon(b));
 }
 
 const fmtSize = (b: number) => (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
