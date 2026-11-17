@@ -10,12 +10,14 @@ import { printNotes } from '../lib/export';
 import { summarize } from '../lib/text';
 import { askConfirm } from './Dialog';
 import { pageCount } from '../lib/pages';
+import { checkAttrs, useSpellcheck } from '../lib/prefs';
 import History from './History';
 
-interface Props { note: Note; folders: Folder[]; onBack: () => void; onOpen: (id: string) => void; wide: boolean; onToggleWide: () => void }
+interface Props { note: Note; folders: Folder[]; onBack: () => void; onClose: () => void; onOpen: (id: string) => void; wide: boolean; onToggleWide: () => void }
 
-export default function Editor({ note, folders, onBack, onOpen, wide, onToggleWide }: Props) {
+export default function Editor({ note, folders, onBack, onClose, onOpen, wide, onToggleWide }: Props) {
   const [title, setTitle] = useState(note.title);
+  const spell = useSpellcheck();
   const [saving, setSaving] = useState(false);
   const [panel, setPanel] = useState<null | 'history' | 'summary'>(null);
   const [menu, setMenu] = useState(false);
@@ -49,7 +51,7 @@ export default function Editor({ note, folders, onBack, onOpen, wide, onToggleWi
     extensions: editorExtensions(),
     content: (note.content as any) ?? '',
     editorProps: {
-      attributes: { class: 'prose', spellcheck: 'true' },
+      attributes: { class: 'prose', ...checkAttrs(spell) },
       handlePaste: (_v, e) => { const fs = [...(e.clipboardData?.files ?? [])]; if (fs.length) { handleFiles(fs, editorRef.current); return true; } return false; },
       handleDrop: (_v, e) => { const fs = [...((e as DragEvent).dataTransfer?.files ?? [])]; if (fs.length) { e.preventDefault(); handleFiles(fs, editorRef.current); return true; } return false; },
     },
@@ -61,6 +63,14 @@ export default function Editor({ note, folders, onBack, onOpen, wide, onToggleWi
     onBlur: flush,
   });
   editorRef.current = editor;
+
+  // Apply the spelling/grammar preference when it changes.
+  useEffect(() => {
+    if (!editor) return;
+    editor.setOptions({ editorProps: { ...editor.options.editorProps, attributes: { class: 'prose', ...checkAttrs(spell) } } });
+    const el = editor.view.dom as HTMLElement;
+    for (const [k, v] of Object.entries(checkAttrs(spell))) el.setAttribute(k, v);
+  }, [editor, spell]);
 
   useEffect(() => () => flush(), []);
   useEffect(() => { const f = () => flush(); window.addEventListener('beforeunload', f); window.addEventListener('pagehide', f); return () => { window.removeEventListener('beforeunload', f); window.removeEventListener('pagehide', f); }; }, []);
@@ -96,6 +106,7 @@ export default function Editor({ note, folders, onBack, onOpen, wide, onToggleWi
         <span className="grow" />
         {pages > 1 && <PageJump pages={pages} onGo={goToPage} />}
         <button className="text-btn desktop-only" onClick={onToggleWide} title="Ctrl/⌘ Shift E">{wide ? 'Exit full width' : 'Full width'}</button>
+        <button className="text-btn desktop-only" onClick={() => { flush(); onClose(); }}>Close</button>
         {!note.deleted_at && <button className={`text-btn ${note.favorite ? 'on' : ''}`} onClick={() => updateNote(note.id, { favorite: !note.favorite })}>{note.favorite ? 'Favourited' : 'Favourite'}</button>}
         <div className="menu-wrap">
           <button className="text-btn" onClick={() => setMenu(!menu)} aria-haspopup="menu" aria-expanded={menu}>More</button>
@@ -106,7 +117,7 @@ export default function Editor({ note, folders, onBack, onOpen, wide, onToggleWi
                 {item('Version history', () => { flush(); setPanel('history'); })}
                 {item('Duplicate', async () => { flush(); const d = await duplicateNote(note.id); if (d) onOpen(d.id); })}
                 {item('Export PDF', () => { flush(); setTimeout(async () => { const n = await db.notes.get(note.id); if (n) printNotes(null, [n]); }, 50); })}
-                {item('Move to Trash', () => { flush(); trashNote(note.id); onBack(); }, 'danger')}
+                {item('Move to Trash', () => { flush(); trashNote(note.id); onClose(); }, 'danger')}
               </>}
             </div>
           )}
@@ -117,7 +128,7 @@ export default function Editor({ note, folders, onBack, onOpen, wide, onToggleWi
         <div className="editor-scroll" ref={scrollRef}>
           <div className="doc">
             {note.deleted_at && <p className="banner">This note is in Trash. <button className="text-btn on" onClick={() => restoreNote(note.id)}>Restore</button></p>}
-            <textarea className="note-title" rows={1} placeholder="Untitled" value={title} onChange={(e) => onTitle(e.target.value)}
+            <textarea className="note-title" rows={1} {...(checkAttrs(spell) as any)} placeholder="Untitled" value={title} onChange={(e) => onTitle(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); editor?.commands.focus('start'); } }} />
             <div className="meta-row">
               <select value={note.folder_id ?? ''} onChange={(e) => updateNote(note.id, { folder_id: e.target.value || null })} aria-label="Notebook">

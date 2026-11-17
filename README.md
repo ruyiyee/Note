@@ -42,6 +42,8 @@ Six sections only: **All Notes, Favourites, Tasks, Calendar, Vocabulary, Trash**
 - **Editor:** text styles, bold/italic/underline, four pink highlight colours, lists, checklist, table, freehand drawing block, pages, image/PDF attachments. **Hyperlinks are deliberately disabled.** "Full width" (Ctrl/⌘+Shift+E) hides the sidebar and list so the note uses nearly the whole screen.
 - **Drawing block** (`src/lib/drawing.ts`): strokes are point lists `{p:[x,y,...], c, w}` in canvas pixels, stored in the note JSON (old `{d}` path strokes are converted on load). Tools: Ink/Pink pen, Eraser (small/medium/large; removes only the touched part of a stroke by splitting it), Lasso (select, drag to move, corner handle to resize, Delete), Move view (pan). Zoom 50–400% with buttons, Ctrl/⌘+wheel or pinch. Undo/Redo (also Ctrl/⌘+Z, Ctrl/⌘+Shift+Z) cover drawing, erasing, lasso and clear; the history lives while the note is open. Every finished gesture is saved into the document, so it autosaves and syncs.
 - **Pages** (`src/lib/pages.ts`): a `pageBreak` node shown as a dashed line labelled "Page N" (CSS counter). The note stays continuous; the header's "Page" box jumps to a page number; PDF export starts each page on a new sheet.
+- **Closing:** "Close" in the note header (and moving a note to Trash) returns the editor to an "Open a note" empty state.
+- **Spelling and grammar check:** on by default; Settings → Writing turns it off on this device (`src/lib/prefs.ts`, sets `spellcheck`, `autocorrect`, `autocapitalize` and Grammarly's `data-gramm` attributes).
 - **Per note (More menu):** Summary (local extractive algorithm, not an AI service), Version history, Duplicate, Export PDF, Move to Trash.
 - **PDF export** of a note or a whole notebook uses the browser print dialog ("Save as PDF"), see `printNotes` in `src/lib/export.ts`.
 - **Design rules from the owner:** navy and pink, five colours (`--white #ffffff`, `--pale #fde4ec`, `--rose #e86a92`, `--navy #1f2a44`, `--grey #8a93a8` in `src/styles.css`), navy sidebar, light theme only (no dark mode), no emojis, no icons, text labels only, generous spacing. Keep it that way.
@@ -68,7 +70,7 @@ src/
     text.ts (search, summary)  srs.ts (SM-2)  drawing.ts (drawing block)  pages.ts (page separators)
     extensions.ts (TipTap setup + private image node)  attachments.ts  export.ts  theme.ts
 supabase/migrations/      0001_init.sql, 0002_items_and_card_notes.sql (idempotent, run in order)
-tests/                    vitest unit tests; tests/e2e/smoke.cjs and drawing.cjs browser tests with a simulated server
+tests/                    vitest unit tests; tests/e2e/smoke.cjs and drawing.cjs, close-and-spellcheck.cjs browser tests with a simulated server
 .github/workflows/deploy.yml        test + build + deploy to GitHub Pages on push to main
 .github/workflows/keepalive.yml     daily ping so the free Supabase project is not paused
 ```

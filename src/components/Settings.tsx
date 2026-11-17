@@ -7,10 +7,12 @@ import { deleteAllFiles } from '../lib/attachments';
 import { countPending, syncNow } from '../lib/sync';
 import { supabaseRemote } from '../lib/remote';
 import { askConfirm, askText } from './Dialog';
+import { setSpellcheck, useSpellcheck } from '../lib/prefs';
 
 export default function Settings({ onClose, session }: { onClose: () => void; session: Session }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [pw, setPw] = useState('');
+  const spell = useSpellcheck();
 
   async function signOut() {
     const pending = await countPending();
@@ -33,6 +35,13 @@ export default function Settings({ onClose, session }: { onClose: () => void; se
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal settings" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Settings">
         <header><h3>Settings</h3><button className="text-btn" onClick={onClose}>Close</button></header>
+        <section>
+          <h4>Writing</h4>
+          <label className="toggle-row">
+            <input type="checkbox" checked={spell} onChange={(e) => setSpellcheck(e.target.checked)} />
+            <span>Spelling and grammar check<span className="muted small"> Red and blue underlines while you type. Saved on this device.</span></span>
+          </label>
+        </section>
         <section>
           <h4>Account</h4>
           <p className="small">Signed in as <strong>{session.user.email}</strong></p>

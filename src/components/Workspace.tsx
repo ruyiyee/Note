@@ -83,9 +83,12 @@ export default function Workspace({ session }: { session: Session }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [newNote]);
 
-  const selected = notes.find((n) => n.id === selectedId) ?? null;
+  const found = notes.find((n) => n.id === selectedId) ?? null;
+  // A deleted note is not shown in the editor (except while browsing Trash).
+  const selected = found && (!found.deleted_at || view.kind === 'trash') ? found : null;
+  const closeNote = useCallback(() => { setSelectedId(null); setPane('list'); }, []);
   const fullWidth = ['vocab', 'tasks', 'calendar'].includes(view.kind);
-  const chooseView = (v: View) => { setView(v); setPane('list'); setQuery(''); };
+  const chooseView = (v: View) => { setView(v); setPane('list'); setQuery(''); if ((v.kind === 'trash') !== (view.kind === 'trash')) setSelectedId(null); };
 
   return (
     <div className={`workspace pane-${pane} ${sidebarHidden ? 'no-sidebar' : ''} ${fullWidth ? 'full' : ''} ${wide && selected && !fullWidth ? 'wide' : ''}`}>
@@ -99,9 +102,15 @@ export default function Workspace({ session }: { session: Session }) {
             selectedId={selectedId} onOpen={openNote} onNew={newNote} onBack={() => setPane('sidebar')}
           />
           {selected ? (
-            <Editor key={selected.id} note={selected} folders={folders} onBack={() => setPane('list')} onOpen={openNote} wide={wide} onToggleWide={toggleWide} />
+            <Editor key={selected.id} note={selected} folders={folders} onBack={() => setPane('list')} onClose={closeNote} onOpen={openNote} wide={wide} onToggleWide={toggleWide} />
           ) : (
-            <main className="editor empty-editor"><p className="muted">Select a note, or create a new one.</p></main>
+            <main className="editor empty-editor">
+              <div className="empty-state">
+                <p className="empty-title">Open a note</p>
+                <p className="muted">Choose a note from the list, or start a new one.</p>
+                {view.kind !== 'trash' && view.kind !== 'folder' && <button className="primary" onClick={newNote}>New note</button>}
+              </div>
+            </main>
           )}
         </>
       )}
