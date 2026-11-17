@@ -2,6 +2,7 @@
 import { db } from './db';
 import { scheduleSync } from './sync';
 import { docToText } from './text';
+import { beforeEdit } from './versions';
 import type { Card, Folder, Item, Note, SyncedTable } from './types';
 
 let currentUser = '';
@@ -37,8 +38,14 @@ export function createNote(init: Partial<Note> = {}): Promise<Note> {
     created_at: t, updated_at: t, deleted_at: null, ...init,
   });
 }
-export const updateNote = (id: string, patch: Partial<Note>) => write<Note>('notes', id, patch);
-export const saveNoteContent = (id: string, content: unknown) => write<Note>('notes', id, { content, content_text: docToText(content) });
+export const updateNote = async (id: string, patch: Partial<Note>) => {
+  if ('title' in patch) await beforeEdit(id);
+  return write<Note>('notes', id, patch);
+};
+export const saveNoteContent = async (id: string, content: unknown) => {
+  await beforeEdit(id);
+  return write<Note>('notes', id, { content, content_text: docToText(content) });
+};
 export const trashNote = (id: string) => write<Note>('notes', id, { deleted_at: now(), pinned: false });
 export const restoreNote = (id: string) => write<Note>('notes', id, { deleted_at: null });
 export async function duplicateNote(id: string) {

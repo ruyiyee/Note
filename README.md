@@ -28,7 +28,7 @@ Supabase project (owned by the user)
 2. **push:** dirty rows are upserted to Supabase. Folders go first, parents before children. A row's `_dirty` is cleared only if `_rev` didn't change during the upload.
 3. **pull:** rows with `updated_at > cursor` (one cursor per table, kept in the `meta` table) are fetched. `updated_at` is always set by a server trigger, so device clocks don't matter. Local rows that are still dirty are not overwritten.
 4. **When it runs:** on app start, on local edits, on window focus or visibility change, when the device comes back online, every 60 s, and on Realtime events.
-5. **Conflicts:** the last write wins, per row. Overwritten note content can be recovered from **version history**: the `notes_snapshot` trigger stores the previous content at most once every 10 minutes per note.
+5. **Conflicts:** the last write wins, per row. Overwritten note content can be recovered from **version history**: the app (`src/lib/versions.ts`) stores the previous content at most once every 30 minutes per note while you edit. Each page load is a "visit"; the first time a note is edited in a new visit, the `compact_note_versions` RPC trims every earlier visit down to its last snapshot. Snapshots need a connection (offline edits are saved, without a snapshot). Requires `0003_version_history_per_visit.sql`.
 6. **Per-table isolation:** push and pull handle each table separately, so a failure in one table (for example a migration that hasn't been run) doesn't block the others.
 7. **Deletes:** deletes are soft (`deleted_at`, shown in Trash). "Empty trash" hard-deletes the rows on the server and requires a connection.
 
@@ -81,7 +81,7 @@ tests/                    vitest unit tests; tests/e2e/smoke.cjs and drawing.cjs
 |---|---|---|
 | `folders` | folders (parent_id null) and notebooks (parent_id set) | `parent_id`, `name`, `color`, `icon`, `position`, `deleted_at` |
 | `notes` | notes | `folder_id`, `title`, `content` (TipTap JSON), `content_text` (plain text), `tags text[]`, `pinned`, `favorite`, `archived`, `inbox`, `deleted_at` |
-| `note_versions` | history snapshots (written by trigger) | `note_id`, `title`, `content`, `created_at` |
+| `note_versions` | history snapshots (written by the app, one per 30 min per visit) | `note_id`, `title`, `content`, `session_id`, `created_at` |
 | `attachments` | file metadata, files in Storage | `note_id`, `path`, `name`, `mime`, `size`, `deleted_at` |
 | `cards` | vocabulary entries with SM-2 state | `front` (word), `back` (definition), `example`, `notes`, `ease`, `interval_days`, `reps`, `lapses`, `due_at` |
 | `items` | standalone tasks and calendar entries | `kind` (`task`/`event`), `title`, `date`, `done`, `deleted_at` |

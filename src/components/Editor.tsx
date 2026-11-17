@@ -11,6 +11,7 @@ import { summarize } from '../lib/text';
 import { askConfirm } from './Dialog';
 import { pageCount } from '../lib/pages';
 import { checkAttrs, useSpellcheck } from '../lib/prefs';
+import { beforeEdit } from '../lib/versions';
 import History from './History';
 
 interface Props { note: Note; folders: Folder[]; onBack: () => void; onClose: () => void; onOpen: (id: string) => void; wide: boolean; onToggleWide: () => void }
@@ -166,7 +167,7 @@ export default function Editor({ note, folders, onBack, onClose, onOpen, wide, o
             )}
           </div>
         </div>
-        {panel === 'history' && <History note={note} onClose={() => setPanel(null)} onRestore={(content, t) => { editor?.commands.setContent(content as any); saveNoteContent(note.id, content); updateNote(note.id, { title: t }); setTitle(t); setPanel(null); }} />}
+        {panel === 'history' && <History note={note} onClose={() => setPanel(null)} onRestore={async (content, t) => { await beforeEdit(note.id, true); editor?.commands.setContent(content as any); saveNoteContent(note.id, content); updateNote(note.id, { title: t }); setTitle(t); setPanel(null); }} />}
         {panel === 'summary' && (
           <aside className="side-panel">
             <header><h3>Summary</h3><button className="text-btn" onClick={() => setPanel(null)}>Close</button></header>

@@ -3,7 +3,7 @@
 _Last updated: 2026-11-16 (navy and pink theme, drawing tools, pages)_
 
 ## Done
-- [x] Supabase schema with RLS on every table, private storage bucket, version-history trigger, account-deletion RPC, ping RPC (`0001_init.sql`); `items` table + `cards.notes` (`0002_items_and_card_notes.sql`)
+- [x] Supabase schema with RLS on every table, private storage bucket, version-history trigger, account-deletion RPC, ping RPC (`0001_init.sql`); `items` table + `cards.notes` (`0002_items_and_card_notes.sql`); version history every 30 min per visit, earlier visits compacted to one (`0003_version_history_per_visit.sql`, user must run it)
 - [x] Auth: sign up, sign in, magic link, password reset email, change password, sign out
 - [x] Offline-first cache (IndexedDB) + outbox + sync engine (push/pull, cursors, Realtime, per-table isolation)
 - [x] Six sections: All Notes, Favourites, Tasks, Calendar, Vocabulary, Trash
@@ -25,7 +25,7 @@ _Last updated: 2026-11-16 (navy and pink theme, drawing tools, pages)_
 - [x] GitHub Pages deploy workflow + daily Supabase keep-alive workflow
 
 ## Verified
-- [x] `npm test`: 21 unit tests (incl. eraser splitting, eraser size, lasso, move/resize, legacy stroke conversion, page count) + (sync engine incl. offline queue, edit-during-upload, one-table-failure isolation, folder deletion keeps notes; search; summary; SM-2)
+- [x] `npm test`: 23 unit tests (incl. 30-minute snapshot interval) (incl. eraser splitting, eraser size, lasso, move/resize, legacy stroke conversion, page count) + (sync engine incl. offline queue, edit-during-upload, one-table-failure isolation, folder deletion keeps notes; search; summary; SM-2)
 - [x] `node tests/e2e/smoke.cjs` against a simulated Supabase API: folder → notebook → note, highlight + drawing saved, links not created, summary panel, PDF export content (note + notebook), search, tasks, calendar entry, vocabulary add + review, phone-sized second device receives note and drawing, no horizontal overflow, offline edit syncs on reconnect, reload persistence, no console errors
 - [x] `node tests/e2e/drawing.cjs`: draw, partial erase with unchanged stroke width, undo/redo of erase, lasso move + delete + undo, zoom, three pages + go to page 3, full width (878px → 1440px), autosave to server, strokes and pages intact after reload, PDF content
 - [x] Live checks on the real project (2026-11-16): site loads, service worker active, anon cannot read or insert rows, anon cannot call `delete_my_account`, storage bucket not public
