@@ -10,6 +10,7 @@ _Last updated: 2026-11-16 (navy and pink theme, drawing tools, pages)_
 - [x] Folders → notebooks → notes; rename/delete; move a note via the notebook selector or drag onto a notebook
 - [x] Notes: create, edit, autosave, duplicate, favourite, Trash → restore / empty, global search with highlighted matches, sort
 - [x] Editor: text styles, bold/italic/underline, four pink highlights, bullets, numbers, checklist, table, freehand drawing, image/PDF attachments; hyperlinks disabled
+- [x] Delete version history: one version, all versions of a note (History panel), or all history (Settings → Your data); uses the existing "own rows" RLS, no extra SQL
 - [x] Word count under the note (total, or "N of M words selected" while text is selected; CJK characters count as one word each)
 - [x] Summary panel (local algorithm) and version history with restore
 - [x] PDF export of a note or a notebook (browser print dialog); JSON + Markdown export of everything

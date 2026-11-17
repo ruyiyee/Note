@@ -36,3 +36,23 @@ export async function beforeEdit(noteId: string, force = false) {
     lastSnap.delete(noteId); // try again on the next edit
   }
 }
+
+// ---- Deleting history (frees database space; the notes themselves are untouched) ----
+async function uid() {
+  const { data } = await supabase.auth.getSession();
+  const id = data.session?.user.id; if (!id) throw new Error('Not signed in.');
+  return id;
+}
+const ok = ({ error }: { error: { message: string } | null }) => { if (error) throw new Error(error.message); };
+export async function deleteVersion(id: string) {
+  ok(await supabase.from('note_versions').delete().eq('id', id).eq('user_id', await uid()));
+}
+export async function deleteNoteVersions(noteId: string) {
+  ok(await supabase.from('note_versions').delete().eq('note_id', noteId).eq('user_id', await uid()));
+  lastSnap.delete(noteId);
+}
+export async function deleteAllVersions(): Promise<number> {
+  const res = await supabase.from('note_versions').delete({ count: 'exact' }).eq('user_id', await uid());
+  ok(res); lastSnap.clear();
+  return res.count ?? 0;
+}

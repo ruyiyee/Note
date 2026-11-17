@@ -8,6 +8,7 @@ import { countPending, syncNow } from '../lib/sync';
 import { supabaseRemote } from '../lib/remote';
 import { askConfirm, askText } from './Dialog';
 import { setSpellcheck, useSpellcheck } from '../lib/prefs';
+import { deleteAllVersions } from '../lib/versions';
 
 export default function Settings({ onClose, session }: { onClose: () => void; session: Session }) {
   const [msg, setMsg] = useState<string | null>(null);
@@ -57,6 +58,14 @@ export default function Settings({ onClose, session }: { onClose: () => void; se
           <div className="row gap wrap">
             <button className="ghost" onClick={async () => { await syncNow(supabaseRemote); await exportJSON(); }}>Export everything (JSON)</button>
             <button className="ghost" onClick={async () => { await syncNow(supabaseRemote); await exportMarkdown(); }}>Export notes (Markdown)</button>
+          </div>
+          <p className="muted small">Version history takes up database space. Deleting it keeps all your notes as they are now.</p>
+          <div className="row gap wrap">
+            <button className="ghost" onClick={async () => {
+              if (!(await askConfirm('Delete the version history of every note? This cannot be undone. Your notes themselves are not affected.', 'Delete history'))) return;
+              try { const n = await deleteAllVersions(); setMsg(`Deleted ${n} saved version${n === 1 ? '' : 's'}.`); }
+              catch (e: any) { setMsg('Could not delete version history: ' + (e.message ?? e)); }
+            }}>Delete all version history</button>
           </div>
         </section>
         <section>
