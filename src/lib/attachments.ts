@@ -3,11 +3,13 @@
 import { BUCKET, supabase } from './supabase';
 import { getCurrentUser, insertRow, uuid, writeRow } from './store';
 import type { Attachment } from './types';
+import { shrinkImage } from './image';
 
 const MAX = 50 * 1024 * 1024;
 
-export async function uploadFile(file: File, noteId: string | null): Promise<Attachment> {
+export async function uploadFile(original: File, noteId: string | null): Promise<Attachment> {
   if (!navigator.onLine) throw new Error('You are offline. Attachments need a connection to upload.');
+  const file = await shrinkImage(original);
   if (file.size > MAX) throw new Error('Files must be under 50 MB.');
   const safe = file.name.replace(/[^\w.\-]+/g, '_').slice(-100);
   const path = `${getCurrentUser()}/${uuid()}-${safe}`;

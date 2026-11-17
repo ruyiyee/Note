@@ -19,6 +19,7 @@ _Last updated: 2026-11-16 (navy and pink theme, drawing tools, pages)_
 - [x] Drawing: clean split-stroke eraser with 3 sizes, undo/redo, zoom and pan (buttons, Ctrl/⌘+wheel, pinch), lasso select/move/resize/delete
 - [x] Pages within a note (dashed "Page N" separators, go-to-page box, one page per sheet in PDF)
 - [x] Close button and "Open a note" empty state (also after moving a note to Trash); spelling/grammar check toggle in Settings
+- [x] Automatic photo shrinking before upload (tested in Chromium: 8.6 MB 4032×3024 photo → 0.66 MB 2000×1500)
 - [x] Account deletion; responsive phone layout; installable PWA; offline app shell
 - [x] GitHub Pages deploy workflow + daily Supabase keep-alive workflow
 
