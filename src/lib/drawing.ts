@@ -161,6 +161,22 @@ export const Drawing = Node.create({
       svg.append(gStrokes, gOverlay);
       dom.append(bar, svg);
 
+      // Tools show only while you work on the drawing. A new (empty) drawing opens ready to draw;
+      // otherwise click/tap the drawing to edit, and click outside, press Done or Escape to finish.
+      let active = false;
+      const setActive = (on: boolean) => {
+        if (on === active) return;
+        active = on; dom.classList.toggle('active', on);
+        if (on) {
+          const sc = dom.closest('.editor-scroll') as HTMLElement | null;
+          if (sc && dom.getBoundingClientRect().top > sc.getBoundingClientRect().top) sc.scrollTop += bar.offsetHeight; // keep the canvas still under the finger
+        } else { selected = []; lassoPath = null; eraserAt = null; gesture = null; pointers.clear(); }
+        renderBar(); render();
+      };
+      const outside = (e: PointerEvent) => { if (active && !dom.contains(e.target as globalThis.Node)) setActive(false); };
+      document.addEventListener('pointerdown', outside, true);
+      dom.title = 'Click to draw';
+
       const commit = (next: Stroke[], extra: Record<string, unknown> = {}) => {
         const pos = typeof getPos === 'function' ? getPos() : undefined;
         if (pos === undefined) return;
@@ -243,7 +259,8 @@ export const Drawing = Node.create({
           btn(`${Math.round(view.s * 100)}%`, () => { view = { s: 1, x: 0, y: 0 }; }),
           btn('Zoom in', () => zoomAt(1.25, view.x + size().w / view.s / 2, view.y + size().h / view.s / 2)), sep(),
           btn('More space', () => commit(work, { height: current.attrs.height + 240 })),
-          btn('Clear', () => { if (work.length) { selected = []; change([]); } }));
+          btn('Clear', () => { if (work.length) { selected = []; change([]); } }),
+          sep(), btn('Done', () => { setActive(false); dom.blur(); }));
         bar.replaceChildren(...items);
       };
 
@@ -267,6 +284,7 @@ export const Drawing = Node.create({
       svg.addEventListener('pointerdown', (e) => {
         if (!editor.isEditable) return;
         e.preventDefault(); dom.focus({ preventScroll: true });
+        if (!active) { setActive(true); return; } // first tap only opens the tools
         svg.setPointerCapture(e.pointerId);
         pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
         if (pointers.size === 2) { // two fingers: pinch-zoom and pan
@@ -334,6 +352,7 @@ export const Drawing = Node.create({
       svg.addEventListener('pointerleave', () => { if (!gesture) { eraserAt = null; render(); } });
 
       svg.addEventListener('wheel', (e) => {
+        if (!active) return;
         if (!e.ctrlKey && !e.metaKey && tool !== 'hand') return; // let the page scroll normally
         e.preventDefault();
         if (e.ctrlKey || e.metaKey) { const [x, y] = toCanvas(e); zoomAt(Math.exp(-e.deltaY * 0.01), x, y); }
@@ -345,12 +364,13 @@ export const Drawing = Node.create({
         if (mod && k === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); renderBar(); render(); }
         else if (mod && k === 'y') { e.preventDefault(); doRedo(); renderBar(); render(); }
         else if ((e.key === 'Delete' || e.key === 'Backspace') && selected.length) { e.preventDefault(); deleteSelection(); renderBar(); render(); }
-        else if (e.key === 'Escape' && selected.length) { selected = []; renderBar(); render(); }
+        else if (e.key === 'Escape') { if (selected.length) { selected = []; renderBar(); render(); } else { setActive(false); dom.blur(); } }
       });
 
       const ro = new ResizeObserver(() => render());
       ro.observe(svg);
       renderBar(); render();
+      if (!work.length) setActive(true);
 
       return {
         dom,
@@ -362,7 +382,7 @@ export const Drawing = Node.create({
         },
         stopEvent: () => true,
         ignoreMutation: () => true,
-        destroy: () => ro.disconnect(),
+        destroy: () => { ro.disconnect(); document.removeEventListener('pointerdown', outside, true); },
       };
     };
   },

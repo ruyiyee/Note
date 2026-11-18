@@ -169,7 +169,10 @@ input[type="checkbox"] { accent-color: var(--pink-4); width: 16px; height: 16px;
 .prose p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--muted); float: left; height: 0; pointer-events: none; }
 
 .drawing { border: 1px solid var(--pink-3); border-radius: var(--radius); overflow: hidden; background: #fff; outline: none; }
-.drawing:focus-within, .drawing:focus { border-color: var(--grey); }
+.drawing.active { border-color: var(--grey); }
+.drawing:not(.active) .drawing-bar { display: none; }
+.drawing:not(.active) svg { cursor: pointer; }
+.drawing:not(.active):hover { border-color: var(--grey); }
 .drawing svg { display: block; width: 100%; touch-action: none; cursor: crosshair; user-select: none; }
 .drawing svg[data-tool="erase"] { cursor: none; }
 .drawing svg[data-tool="hand"] { cursor: grab; } .drawing svg[data-tool="hand"]:active { cursor: grabbing; }
