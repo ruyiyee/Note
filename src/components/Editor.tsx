@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import WordCount from './WordCount';
 import { EditorContent, useEditor, type Editor as TEditor } from '@tiptap/react';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -8,7 +8,6 @@ import { duplicateNote, restoreNote, saveNoteContent, trashNote, updateNote } fr
 import { signedUrl, trashAttachment, uploadFile } from '../lib/attachments';
 import { db } from '../lib/db';
 import { printNotes } from '../lib/export';
-import { summarize } from '../lib/text';
 import { askConfirm } from './Dialog';
 import { pageCount } from '../lib/pages';
 import { checkAttrs, useSpellcheck } from '../lib/prefs';
@@ -21,7 +20,7 @@ export default function Editor({ note, folders, onBack, onClose, onOpen, wide, o
   const [title, setTitle] = useState(note.title);
   const spell = useSpellcheck();
   const [saving, setSaving] = useState(false);
-  const [panel, setPanel] = useState<null | 'history' | 'summary'>(null);
+  const [panel, setPanel] = useState<null | 'history'>(null);
   const [menu, setMenu] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -103,7 +102,6 @@ export default function Editor({ note, folders, onBack, onClose, onOpen, wide, o
     if (el) root.scrollTo({ top: el.offsetTop - 24, behavior: 'smooth' });
   };
 
-  const summary = useMemo(() => (panel === 'summary' ? summarize(note.content_text, 5) : []), [panel, note.content_text]);
   const status = saving ? 'Saving' : note._dirty === 1 ? 'Saved on this device, waiting to sync' : 'Saved';
   const item = (label: string, run: () => void, cls = '') => <button className={cls} onClick={() => { setMenu(false); run(); }}>{label}</button>;
 
@@ -122,7 +120,6 @@ export default function Editor({ note, folders, onBack, onClose, onOpen, wide, o
           {menu && (
             <div className="dropdown" role="menu" onMouseLeave={() => setMenu(false)}>
               {note.deleted_at ? item('Restore from Trash', () => restoreNote(note.id)) : <>
-                {item('Summary', () => { flush(); setPanel('summary'); })}
                 {item('Version history', () => { flush(); setPanel('history'); })}
                 {item('Duplicate', async () => { flush(); const d = await duplicateNote(note.id); if (d) onOpen(d.id); })}
                 {item('Export PDF', () => { flush(); setTimeout(async () => { const n = await db.notes.get(note.id); if (n) printNotes(null, [n]); }, 50); })}
@@ -169,13 +166,6 @@ export default function Editor({ note, folders, onBack, onClose, onOpen, wide, o
           </div>
         </div>
         {panel === 'history' && <History note={note} onClose={() => setPanel(null)} onRestore={async (content, t) => { await beforeEdit(note.id, true); editor?.commands.setContent(content as any); saveNoteContent(note.id, content); updateNote(note.id, { title: t }); setTitle(t); setPanel(null); }} />}
-        {panel === 'summary' && (
-          <aside className="side-panel">
-            <header><h3>Summary</h3><button className="text-btn" onClick={() => setPanel(null)}>Close</button></header>
-            {summary.length ? <ul className="summary">{summary.map((s, i) => <li key={i}>{s}</li>)}</ul> : <p className="muted">Write a few sentences first.</p>}
-            <p className="muted small">The key sentences of this note, picked on your device. Nothing is sent to an AI service.</p>
-          </aside>
-        )}
       </div>
       {editor && <WordCount editor={editor} />}
     </main>

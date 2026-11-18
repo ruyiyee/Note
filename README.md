@@ -45,7 +45,7 @@ Six sections only: **All Notes, Favourites, Tasks, Calendar, Vocabulary, Trash**
 - **Photo shrinking:** images are resized to at most 2000 px on the longest side and re-encoded (JPEG 85%, or WebP for PNG/WebP to keep transparency) before upload (`src/lib/image.ts`). GIF, SVG, PDFs and images that wouldn't get smaller are uploaded unchanged. Originals are not kept (owner's choice).
 - **Closing:** "Close" in the note header (and moving a note to Trash) returns the editor to an "Open a note" empty state.
 - **Spelling and grammar check:** on by default; Settings → Writing turns it off on this device (`src/lib/prefs.ts`, sets `spellcheck`, `autocorrect`, `autocapitalize` and Grammarly's `data-gramm` attributes).
-- **Per note (More menu):** Summary (local extractive algorithm, not an AI service), Version history, Duplicate, Export PDF, Move to Trash.
+- **Per note (More menu):** Version history, Duplicate, Export PDF, Move to Trash.
 - **PDF export** of a note or a whole notebook uses the browser print dialog ("Save as PDF"), see `printNotes` in `src/lib/export.ts`.
 - **Design rules from the owner:** navy and pink, five colours (`--white #ffffff`, `--pale #fde4ec`, `--rose #e86a92`, `--navy #1f2a44`, `--grey #8a93a8` in `src/styles.css`), navy sidebar, light theme only (no dark mode), no emojis, no icons, text labels only, generous spacing. Keep it that way.
 - Removed on purpose: Inbox, Recent, Archive, tags, templates, links/backlinks/graph, flashcard generation from notes, dictionary lookup. The database columns (`inbox`, `archived`, `pinned`, `tags`, `color`, `icon`) still exist and are simply unused; old data is preserved and all non-deleted notes show in All Notes.
@@ -58,7 +58,7 @@ src/
     Workspace.tsx         layout, views, keyboard shortcuts, sync wiring
     Sidebar.tsx           six sections + folder/notebook tree
     NoteList.tsx          notes of the current view, notebooks of a folder, search, rename/delete, notebook PDF export
-    Editor.tsx            TipTap editor, toolbar, autosave, attachments, summary panel
+    Editor.tsx            TipTap editor, toolbar, autosave, attachments, word count
     History.tsx           version history (server snapshots) + restore
     TasksView.tsx         standalone task list
     CalendarView.tsx      month grid + entries per day
@@ -68,7 +68,7 @@ src/
     SyncBadge.tsx, Auth.tsx
   lib/
     supabase.ts db.ts sync.ts remote.ts store.ts types.ts
-    text.ts (search, summary)  srs.ts (SM-2)  drawing.ts (drawing block)  pages.ts (page separators)
+    text.ts (search, word count)  srs.ts (SM-2)  drawing.ts (drawing block)  pages.ts (page separators)
     extensions.ts (TipTap setup + private image node)  attachments.ts  export.ts  theme.ts
 supabase/migrations/      0001_init.sql, 0002_items_and_card_notes.sql (idempotent, run in order)
 tests/                    vitest unit tests; tests/e2e/smoke.cjs and drawing.cjs, close-and-spellcheck.cjs browser tests with a simulated server
@@ -118,9 +118,6 @@ There is no custom backend. The client talks to Supabase directly:
 - **Supabase's built-in email** sends only a few auth emails per hour. For heavier use, configure custom SMTP under Auth → SMTP.
 - **Backups:** the free tier has no downloadable point-in-time backups. Use Settings → Export regularly. The JSON export contains all rows, but it doesn't include attachment files; download those from Supabase Storage.
 - **GitHub Pages:** free for public repos. The repo contains only code and public keys, no notes.
-
-## Summary feature (no AI service, no cost)
-"Summary" picks the key sentences of a note with a word-frequency algorithm in `src/lib/text.ts`. It runs on the device; nothing is sent anywhere.
 
 ## Keyboard shortcuts
 `Ctrl/⌘+Alt+N` new note · `Ctrl/⌘+K` search · `Ctrl/⌘+Shift+E` full width · `Ctrl/⌘+\` toggle sidebar · `Ctrl/⌘+S` sync now · `Ctrl/⌘+B/I/U` formatting.

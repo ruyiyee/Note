@@ -49,8 +49,10 @@ export async function printNotes(heading: string | null, notes: Note[]) {
   for (const n of notes) {
     const art = document.createElement('article');
     const h1 = document.createElement('h1'); h1.textContent = n.title || 'Untitled';
+    const meta = document.createElement('div'); meta.className = 'print-meta';
+    meta.textContent = new Date(n.updated_at || n.created_at).toLocaleDateString(undefined, { dateStyle: 'long' });
     const body = document.createElement('div'); body.className = 'prose'; body.innerHTML = docToHtml(n.content);
-    art.append(h1, body); root.append(art);
+    art.append(h1, meta, body); root.append(art);
   }
   const imgs = [...root.querySelectorAll<HTMLImageElement>('img[data-path]')];
   await Promise.all(imgs.map(async (img) => {

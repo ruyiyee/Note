@@ -65,9 +65,11 @@ const OUT = process.env.SMOKE_OUT || 'tests/e2e/out-';
   await a.click('.ProseMirror p >> nth=0'); await a.keyboard.press('End'); await a.keyboard.type(' https://example.com ');
   results.noLinks = (await a.locator('.ProseMirror a').count()) === 0;
 
-  // summary + history panels open
-  await a.click('.editor-head >> text=More'); await a.click('.dropdown >> text=Summary');
-  results.summaryPanel = await a.locator('.side-panel h3').textContent();
+  // Summary is removed; history panel opens
+  await a.click('.editor-head >> text=More');
+  results.noSummaryItem = (await a.locator('.dropdown >> text=Summary').count()) === 0;
+  await a.click('.dropdown >> text=Version history');
+  results.historyPanel = await a.locator('.side-panel h3').textContent();
   await a.click('.side-panel >> text=Close');
 
   // PDF export container (print dialog itself is stubbed)

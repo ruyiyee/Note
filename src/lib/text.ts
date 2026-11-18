@@ -61,23 +61,6 @@ export function highlightParts(s: string, terms: string[]): [string, boolean][] 
 }
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-// ---------- summary (a local algorithm, not an AI service) ----------
-const STOP = new Set('a an and are as at be but by for from has have he her his i in is it its of on or our she that the their them they this to was we were will with you your not can do does did so if then than there these those which who what when where how all any also into about over more most such only other some'.split(' '));
-
-/** Extractive summary: picks the highest-scoring sentences by word frequency. */
-export function summarize(text: string, maxSentences = 3): string[] {
-  const sentences = text.replace(/\n+/g, '. ').split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter((s) => s.length > 20);
-  if (sentences.length <= maxSentences) return sentences;
-  const freq = new Map<string, number>();
-  for (const w of text.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? []) if (!STOP.has(w) && w.length > 2) freq.set(w, (freq.get(w) ?? 0) + 1);
-  const scored = sentences.map((s, i) => {
-    const words = s.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? [];
-    const sc = words.reduce((a, w) => a + (freq.get(w) ?? 0), 0) / Math.max(4, words.length);
-    return { s, i, sc };
-  });
-  return scored.sort((a, b) => b.sc - a.sc).slice(0, maxSentences).sort((a, b) => a.i - b.i).map((x) => x.s);
-}
-
 // Word count. Chinese/Japanese/Korean characters count one word each (they have no spaces);
 // everything else is counted by runs of letters/digits, so "don't" and "e-mail" are one word.
 const CJK = /[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯]/gu;

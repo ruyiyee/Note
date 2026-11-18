@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { docToText, parseTerms, scoreText, snippet, summarize } from '../src/lib/text';
+import { docToText, parseTerms, scoreText, snippet } from '../src/lib/text';
 import { review } from '../src/lib/srs';
 
 const doc = { type: 'doc', content: [
@@ -19,7 +19,6 @@ describe('text utils', () => {
     expect(scoreText('x', 'y', ['missing'])).toBe(0);
     expect(snippet('Plants turn light into energy', ['light']).some(([t, hit]) => hit && t === 'light')).toBe(true);
   });
-  it('summarises', () => { expect(summarize('One sentence about cats and dogs here. Another sentence about cats only here. Third one is unrelated stuff entirely here. Cats cats cats are great pets.', 2)).toHaveLength(2); });
   it('schedules SM-2 reviews', () => {
     const base: any = { ease: 2.5, interval_days: 0, reps: 0, lapses: 0 };
     const r1 = review(base, 2); expect(r1.interval_days).toBe(1);
