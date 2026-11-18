@@ -87,6 +87,7 @@ export interface NoteVersion {
   title: string;
   content: unknown | null;
   content_text: string;
+  session_id: string | null; // the visit that saved it (see versions.ts)
   created_at: string;
 }
 

@@ -2,6 +2,7 @@
 // Run: npm run build && npx vite preview --port 4173 &   then: node tests/e2e/smoke.cjs
 const { chromium } = require('playwright');
 const OUT = process.env.SMOKE_OUT || 'tests/e2e/out-';
+const deletes = [];
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAIAAAAt/+nTAAAAKElEQVR42u3OMQEAAAgDoK1/aI3hAZ5QIBdHrEgRERERERERERERkW8eRhAAIZoQ+YgAAAAASUVORK5CYII=', 'base64');
 (async () => {
   const b = await chromium.launch();
@@ -13,6 +14,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAIAAAAt/+nTAAAAKElEQVR
     page.on('console', (m) => { if (m.type() === 'error' && !/WebSocket|realtime|ERR_/.test(m.text())) errors.push('console: ' + m.text()); });
     await page.route(/supabase\.co/, async (route) => {
       const req = route.request(); const u = new URL(req.url());
+      if (req.method() === 'DELETE') deletes.push(u.pathname + (u.search ? '?' + decodeURIComponent(u.search.slice(1)).slice(0, 60) : '') + (req.postData() ? ' ' + req.postData().slice(0, 120) : ''));
       if (u.pathname.includes('/storage/v1/object/sign/')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ signedURL: '/storage/v1/object/x?token=t' }) });
       if (u.pathname.includes('/storage/v1/object/x')) return route.fulfill({ status: 200, contentType: 'image/png', body: PNG });
       if (u.pathname.includes('/storage/v1/object/')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ Key: 'k' }) });
@@ -52,6 +54,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAIAAAAt/+nTAAAAKElEQVR
   await a.waitForSelector('.ProseMirror img', { timeout: 8000 }); await a.waitForTimeout(500);
   const order = () => a.evaluate(() => [...document.querySelector('.ProseMirror').children].map((e) => e.tagName === 'IMG' ? 'IMG' : e.textContent.slice(0, 6)));
   results.afterPaste = await order();
+  results.imageShown = await a.evaluate(() => { const i = document.querySelector('.ProseMirror img'); return i.complete && i.naturalWidth > 0; });
   results.filesListAfterImage = await a.locator('.attachments').count();
   // Drop a second image onto the first paragraph
   const box = await a.locator('.ProseMirror p:has-text("First")').boundingBox();
@@ -72,6 +75,16 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAIAAAAt/+nTAAAAKElEQVR
   await a.setInputFiles('input[type=file]', { name: 'worksheet.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 test') });
   await a.waitForSelector('.attachments', { timeout: 8000 }); results.filesList = await a.locator('.attachments').innerText();
   await a.screenshot({ path: OUT + 'images-inline.png' });
+  await a.waitForTimeout(1500);
+  results.noSignedLinkSaved = [...server.notes.values()].every((n) => !JSON.stringify(n.content).includes('token='));
+  // Removing the PDF deletes the stored file
+  await a.click('.attachment >> text=Remove'); await a.click('.dialog .primary'); await a.waitForTimeout(800);
+  results.filesAfterRemove = await a.locator('.attachments').count();
+  // Emptying Trash deletes the note's stored images, its file records and the note
+  await a.click('.editor-head >> text=More'); await a.click('.dropdown >> text=Move to Trash'); await a.waitForTimeout(800);
+  await a.click('.nav-item:has-text("Trash")'); await a.click('.list-head >> text=Empty'); await a.click('.dialog .primary'); await a.waitForTimeout(1000);
+  results.trashAfterEmpty = await a.locator('.note-item').count();
+  results.deletes = deletes;
   console.log(JSON.stringify(results, null, 1)); console.log('ERRORS:', errors);
   await b.close();
 })().catch((e) => { console.error('FAILED', e); process.exit(1); });

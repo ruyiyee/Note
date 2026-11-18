@@ -14,6 +14,7 @@ _Last updated: 2026-11-16 (navy and pink theme, drawing tools, pages)_
 - [x] Word count under the note (total, or "N of M words selected" while text is selected; CJK characters count as one word each)
 - [x] Version history with restore (Summary was removed at the user's request)
 - [x] Drawing tools show only while editing a drawing: new drawings open with tools; click/tap a drawing to show them (that tap draws nothing); click outside, Done or Escape hides them (`tests/e2e/drawing-tools-toggle.cjs`)
+- [x] Code review (Nov 2026): saving no longer waits for the network; a title typed just before closing is saved; removing a file and emptying Trash free storage; Trash clears on all devices; pull overlap for simultaneous edits; signed image links no longer stored in notes; leftovers of removed features deleted (`tests/e2e/review-fixes.cjs`, `images-inline.cjs`)
 - [x] Images live only inside the note (pasted at the cursor, dropped where dropped, movable by dragging); the "Files" list under a note shows only non-image files such as PDFs (`tests/e2e/images-inline.cjs`)
 - [x] Colourful PDF export in the app palette (title accent, coloured headings and bullets, navy table header, highlights kept)
 - [x] PDF export of a note or a notebook (browser print dialog); JSON + Markdown export of everything
@@ -30,7 +31,7 @@ _Last updated: 2026-11-16 (navy and pink theme, drawing tools, pages)_
 - [x] GitHub Pages deploy workflow + daily Supabase keep-alive workflow
 
 ## Verified
-- [x] `npm test`: 25 unit tests (incl. 30-minute snapshot interval, word count) (incl. eraser splitting, eraser size, lasso, move/resize, legacy stroke conversion, page count) + (sync engine incl. offline queue, edit-during-upload, one-table-failure isolation, folder deletion keeps notes; search; SM-2)
+- [x] `npm test`: 27 unit tests (incl. 30-minute snapshot interval, word count, notes emptied from Trash on another device, late-stamped change still pulled) (incl. eraser splitting, eraser size, lasso, move/resize, legacy stroke conversion, page count) + (sync engine incl. offline queue, edit-during-upload, one-table-failure isolation, folder deletion keeps notes; search; SM-2)
 - [x] `node tests/e2e/smoke.cjs` against a simulated Supabase API: folder → notebook → note, highlight + drawing saved, links not created, no Summary item, PDF export content (note + notebook), search, tasks, calendar entry, vocabulary add + review, phone-sized second device receives note and drawing, no horizontal overflow, offline edit syncs on reconnect, reload persistence, no console errors
 - [x] `node tests/e2e/drawing.cjs`: draw, partial erase with unchanged stroke width, undo/redo of erase, lasso move + delete + undo, zoom, three pages + go to page 3, full width (878px → 1440px), autosave to server, strokes and pages intact after reload, PDF content
 - [x] Live checks on the real project (2026-11-16): site loads, service worker active, anon cannot read or insert rows, anon cannot call `delete_my_account`, storage bucket not public

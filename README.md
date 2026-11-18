@@ -26,11 +26,11 @@ Supabase project (owned by the user)
 ### How sync works (`src/lib/sync.ts`)
 1. Every local write goes through `src/lib/store.ts`. It writes the row to IndexedDB with `_dirty=1`, bumps `_rev` and schedules a sync after about 0.8 s.
 2. **push:** dirty rows are upserted to Supabase. Folders go first, parents before children. A row's `_dirty` is cleared only if `_rev` didn't change during the upload.
-3. **pull:** rows with `updated_at > cursor` (one cursor per table, kept in the `meta` table) are fetched. `updated_at` is always set by a server trigger, so device clocks don't matter. Local rows that are still dirty are not overwritten.
+3. **pull:** rows with `updated_at > cursor` (one cursor per table, kept in the `meta` table) are fetched. `updated_at` is always set by a server trigger, so device clocks don't matter. Each pull re-reads the last 5 seconds before the cursor, so a save from another device that committed at the same moment is not missed. Local rows that are still dirty are not overwritten.
 4. **When it runs:** on app start, on local edits, on window focus or visibility change, when the device comes back online, every 60 s, and on Realtime events.
-5. **Conflicts:** the last write wins, per row. Overwritten note content can be recovered from **version history**: the app (`src/lib/versions.ts`) stores the previous content at most once every 30 minutes per note while you edit. Each page load is a "visit"; the first time a note is edited in a new visit, the `compact_note_versions` RPC trims every earlier visit down to its last snapshot. Snapshots need a connection (offline edits are saved, without a snapshot). Requires `0003_version_history_per_visit.sql`.
+5. **Conflicts:** the last write wins, per row. Overwritten note content can be recovered from **version history**: the app (`src/lib/versions.ts`) stores the previous content at most once every 30 minutes per note while you edit. The snapshot is read from the device and uploaded in the background, so saving never waits for the network. Each page load is a "visit"; the first time a note is edited in a new visit, the `compact_note_versions` RPC trims every earlier visit down to its last snapshot. Snapshots need a connection (offline edits are saved, without a snapshot). Requires `0003_version_history_per_visit.sql`.
 6. **Per-table isolation:** push and pull handle each table separately, so a failure in one table (for example a migration that hasn't been run) doesn't block the others.
-7. **Deletes:** deletes are soft (`deleted_at`, shown in Trash). "Empty trash" hard-deletes the rows on the server and requires a connection.
+7. **Deletes:** deletes are soft (`deleted_at`, shown in Trash). "Empty trash" (`src/lib/trash.ts`) deletes the notes, their stored files (except images a duplicated note still shows) and their file records on the server, and requires a connection. Other devices drop those notes from their Trash on their next sync. Removing a file from a note also deletes it from storage.
 
 The sync engine is unit-tested against an in-memory fake server (`tests/sync.test.ts`).
 
@@ -69,9 +69,9 @@ src/
   lib/
     supabase.ts db.ts sync.ts remote.ts store.ts types.ts
     text.ts (search, word count)  srs.ts (SM-2)  drawing.ts (drawing block)  pages.ts (page separators)
-    extensions.ts (TipTap setup + private image node)  attachments.ts  export.ts  theme.ts
+    extensions.ts (TipTap setup + private image node)  attachments.ts  export.ts  trash.ts
 supabase/migrations/      0001_init.sql, 0002_items_and_card_notes.sql (idempotent, run in order)
-tests/                    vitest unit tests; tests/e2e/smoke.cjs and drawing.cjs, close-and-spellcheck.cjs browser tests with a simulated server
+tests/                    vitest unit tests; tests/e2e/*.cjs browser tests with a simulated server
 .github/workflows/deploy.yml        test + build + deploy to GitHub Pages on push to main
 .github/workflows/keepalive.yml     daily ping so the free Supabase project is not paused
 ```

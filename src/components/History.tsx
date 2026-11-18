@@ -24,7 +24,7 @@ export default function History({ note, onClose, onRestore }: { note: Note; onCl
       {versions?.length === 0 && <p className="muted small">No earlier versions yet.</p>}
       {versions?.map((v) => (
         <button key={v.id} className={`version ${sel?.id === v.id ? 'active' : ''}`} onClick={() => setSel(v)}>
-          <span>{new Date(v.created_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span><span className="muted small">{(v as any).session_id === SESSION ? 'This visit' : 'Earlier visit'}{v.title ? `, ${v.title}` : ''}</span>
+          <span>{new Date(v.created_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span><span className="muted small">{v.session_id === SESSION ? 'This visit' : 'Earlier visit'}{v.title ? `, ${v.title}` : ''}</span>
         </button>
       ))}
       {sel && (

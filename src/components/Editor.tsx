@@ -45,8 +45,7 @@ export default function Editor({ note, folders, onBack, onClose, onOpen, wide, o
       try {
         const a = await uploadFile(f, note.id);
         if (f.type.startsWith('image/') && editor) {
-          const url = await signedUrl(a.path);
-          const img = { type: 'image', attrs: { src: url, alt: f.name, path: a.path } };
+          const img = { type: 'image', attrs: { src: '', alt: f.name, path: a.path } };
           if (at !== undefined && at <= editor.state.doc.content.size) { editor.chain().focus().insertContentAt(at, img).run(); at = undefined; }
           else editor.chain().focus().insertContent(img).run();
         }
