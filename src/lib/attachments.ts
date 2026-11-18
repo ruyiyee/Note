@@ -32,7 +32,20 @@ export async function signedUrl(path: string): Promise<string> {
   return data.signedUrl;
 }
 
-export const trashAttachment = (id: string) => writeRow<Attachment>('attachments', id, { deleted_at: new Date().toISOString() });
+/** Delete stored files by path (in batches; storage accepts many paths per call). */
+export async function deleteFiles(paths: string[]) {
+  for (let i = 0; i < paths.length; i += 100) {
+    const { error } = await supabase.storage.from(BUCKET).remove(paths.slice(i, i + 100));
+    if (error) throw error;
+  }
+}
+
+/** Remove a file from a note: frees its storage, then marks the row deleted so other devices drop it. */
+export async function removeAttachment(a: Attachment) {
+  if (!navigator.onLine) throw new Error('You are offline. Removing a file needs a connection.');
+  await deleteFiles([a.path]);
+  await writeRow<Attachment>('attachments', a.id, { deleted_at: new Date().toISOString() });
+}
 
 /** Remove every file of the current user (used by account deletion). */
 export async function deleteAllFiles() {
@@ -41,8 +54,7 @@ export async function deleteAllFiles() {
     const { data, error } = await supabase.storage.from(BUCKET).list(prefix, { limit: 1000 });
     if (error) throw error;
     if (!data?.length) break;
-    const { error: e2 } = await supabase.storage.from(BUCKET).remove(data.map((f) => `${prefix}/${f.name}`));
-    if (e2) throw e2;
+    await deleteFiles(data.map((f) => `${prefix}/${f.name}`));
     if (data.length < 1000) break;
   }
 }

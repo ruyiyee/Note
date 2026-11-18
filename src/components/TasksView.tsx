@@ -20,15 +20,6 @@ export default function TasksView({ onBack }: { onBack: () => void }) {
     };
   }, [all]);
 
-  const Row = ({ t }: { t: Item }) => (
-    <li className={`task ${t.done ? 'done' : ''}`}>
-      <input type="checkbox" checked={t.done} onChange={() => updateItem(t.id, { done: !t.done })} aria-label={t.done ? 'Mark as not done' : 'Mark as done'} />
-      <span className="grow">{t.title}</span>
-      {t.date && <span className={`due ${!t.done && t.date < today ? 'late' : ''}`}>{fmt(t.date)}</span>}
-      <button className="text-btn row-action" onClick={() => trashItem(t.id)}>Remove</button>
-    </li>
-  );
-
   return (
     <section className="fullpane">
       <header className="list-head">
@@ -41,13 +32,24 @@ export default function TasksView({ onBack }: { onBack: () => void }) {
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Due date (optional)" />
           <button className="primary">Add</button>
         </form>
-        <ul className="tasks">{open.map((t) => <Row key={t.id} t={t} />)}</ul>
+        <ul className="tasks">{open.map((t) => <Row key={t.id} t={t} today={today} />)}</ul>
         {!open.length && <p className="muted empty">Nothing to do.</p>}
         {done.length > 0 && <>
           <h4>Completed</h4>
-          <ul className="tasks">{done.map((t) => <Row key={t.id} t={t} />)}</ul>
+          <ul className="tasks">{done.map((t) => <Row key={t.id} t={t} today={today} />)}</ul>
         </>}
       </div>
     </section>
+  );
+}
+
+function Row({ t, today }: { t: Item; today: string }) {
+  return (
+    <li className={`task ${t.done ? 'done' : ''}`}>
+      <input type="checkbox" checked={t.done} onChange={() => updateItem(t.id, { done: !t.done })} aria-label={t.done ? 'Mark as not done' : 'Mark as done'} />
+      <span className="grow">{t.title}</span>
+      {t.date && <span className={`due ${!t.done && t.date < today ? 'late' : ''}`}>{fmt(t.date)}</span>}
+      <button className="text-btn row-action" onClick={() => trashItem(t.id)}>Remove</button>
+    </li>
   );
 }

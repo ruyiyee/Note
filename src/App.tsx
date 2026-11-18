@@ -5,13 +5,10 @@ import { clearLocal, getMeta, setMeta } from './lib/db';
 import { setCurrentUser } from './lib/store';
 import Auth from './components/Auth';
 import Workspace from './components/Workspace';
-import { applyTheme } from './lib/theme';
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [ready, setReady] = useState(false);
-
-  useEffect(() => { applyTheme(); }, []);
 
   useEffect(() => {
     if (!isConfigured) return;

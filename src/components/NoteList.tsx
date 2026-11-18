@@ -4,8 +4,7 @@ import type { Sort, View } from './Workspace';
 import { parseTerms, scoreText, snippet } from '../lib/text';
 import { createFolder, restoreNote, trashFolder, updateFolder } from '../lib/store';
 import { printNotes } from '../lib/export';
-import { db } from '../lib/db';
-import { supabase } from '../lib/supabase';
+import { purgeNotes } from '../lib/trash';
 import { askConfirm, askText } from './Dialog';
 
 interface Props {
@@ -42,10 +41,8 @@ export default function NoteList({ view, onView, notes, folders, query, onQuery,
 
   async function emptyTrash() {
     if (!(await askConfirm('Permanently delete everything in Trash? This cannot be undone.', 'Delete'))) return;
-    const ids = notes.filter((n) => n.deleted_at).map((n) => n.id);
-    const { error } = await supabase.from('notes').delete().in('id', ids);
-    if (error) return alert('Could not empty Trash: ' + error.message);
-    await db.notes.bulkDelete(ids);
+    try { await purgeNotes(notes.filter((n) => n.deleted_at).map((n) => n.id)); }
+    catch (e: any) { alert('Could not empty Trash: ' + (e.message ?? e)); }
   }
   async function rename() { if (!here) return; const name = await askText('Rename', here.name); if (name) updateFolder(here.id, { name }); }
   async function remove() {

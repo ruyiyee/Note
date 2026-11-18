@@ -5,7 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import type { Folder, Note } from '../lib/types';
 import { editorExtensions, HIGHLIGHTS } from '../lib/extensions';
 import { duplicateNote, restoreNote, saveNoteContent, trashNote, updateNote } from '../lib/store';
-import { signedUrl, trashAttachment, uploadFile } from '../lib/attachments';
+import { removeAttachment, signedUrl, uploadFile } from '../lib/attachments';
 import { db } from '../lib/db';
 import { printNotes } from '../lib/export';
 import { askConfirm } from './Dialog';
@@ -30,9 +30,13 @@ export default function Editor({ note, folders, onBack, onClose, onOpen, wide, o
   // Images live inside the note itself, so only other files (PDFs) are listed under the note.
   const files = attachments.filter((a) => !a.deleted_at && !a.mime.startsWith('image/'));
 
+  const pendingTitle = useRef<string | null>(null);
+  const titleTimer = useRef<ReturnType<typeof setTimeout>>();
+  /** Save anything typed but not yet saved (content and title). */
   const flush = () => {
-    clearTimeout(saveTimer.current);
+    clearTimeout(saveTimer.current); clearTimeout(titleTimer.current);
     if (pendingDoc.current) { const d = pendingDoc.current; pendingDoc.current = null; saveNoteContent(note.id, d).finally(() => setSaving(false)); }
+    if (pendingTitle.current !== null) { const t = pendingTitle.current; pendingTitle.current = null; updateNote(note.id, { title: t }); }
   };
 
   async function handleFiles(list: File[], editor: TEditor | null, at?: number) {
@@ -94,8 +98,7 @@ export default function Editor({ note, folders, onBack, onClose, onOpen, wide, o
     try { editor.commands.setTextSelection({ from: Math.min(from, max), to: Math.min(to, max) }); } catch { /* ignore */ }
   }, [note.updated_at]);
 
-  const titleTimer = useRef<ReturnType<typeof setTimeout>>();
-  const onTitle = (v: string) => { setTitle(v); clearTimeout(titleTimer.current); titleTimer.current = setTimeout(() => updateNote(note.id, { title: v }), 400); };
+  const onTitle = (v: string) => { setTitle(v); pendingTitle.current = v; clearTimeout(titleTimer.current); titleTimer.current = setTimeout(flush, 400); };
 
   const pages = pageCount(note.content);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -162,14 +165,14 @@ export default function Editor({ note, folders, onBack, onClose, onOpen, wide, o
                   <div key={a.id} className="attachment">
                     <button className="text-btn on grow" onClick={async () => { try { window.open(await signedUrl(a.path), '_blank', 'noopener'); } catch (e: any) { setErr(e.message); } }}>{a.name}</button>
                     <span className="muted small">{fmtSize(a.size)}</span>
-                    <button className="text-btn" onClick={async () => (await askConfirm(`Remove ${a.name}?`, 'Remove')) && trashAttachment(a.id)}>Remove</button>
+                    <button className="text-btn" onClick={async () => { if (await askConfirm(`Remove ${a.name}?`, 'Remove')) removeAttachment(a).catch((e) => setErr(e.message ?? String(e))); }}>Remove</button>
                   </div>
                 ))}
               </div>
             )}
           </div>
         </div>
-        {panel === 'history' && <History note={note} onClose={() => setPanel(null)} onRestore={async (content, t) => { await beforeEdit(note.id, true); editor?.commands.setContent(content as any); saveNoteContent(note.id, content); updateNote(note.id, { title: t }); setTitle(t); setPanel(null); }} />}
+        {panel === 'history' && <History note={note} onClose={() => setPanel(null)} onRestore={async (content, t) => { flush(); await beforeEdit(note.id, true); editor?.commands.setContent(content as any, { emitUpdate: false }); await saveNoteContent(note.id, content); updateNote(note.id, { title: t }); setTitle(t); setPanel(null); }} />}
       </div>
       {editor && <WordCount editor={editor} />}
     </main>

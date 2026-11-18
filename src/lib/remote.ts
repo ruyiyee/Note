@@ -16,6 +16,15 @@ export const supabaseRemote: Remote = {
     if (error) throw error;
     return data ?? [];
   },
+  async existingIds(table, ids) {
+    const out: string[] = [];
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data, error } = await supabase.from(table).select('id').in('id', ids.slice(i, i + 100));
+      if (error) throw error;
+      out.push(...(data ?? []).map((r) => r.id));
+    }
+    return out;
+  },
 };
 
 /** Subscribe to row changes on all synced tables; calls onChange (debounce it upstream). */

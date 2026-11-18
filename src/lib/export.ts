@@ -12,7 +12,7 @@ td.addRule('task', { filter: (n) => n.nodeName === 'LI' && (n as HTMLElement).da
 td.addRule('mark', { filter: 'mark', replacement: (c) => `==${c}==` });
 
 export function noteToMarkdown(n: Note): string {
-  const front = [`# ${n.title || 'Untitled'}`, '', n.tags.length ? `Tags: ${n.tags.map((t) => '#' + t).join(' ')}` : '', `Created: ${n.created_at}`, `Updated: ${n.updated_at}`, ''].filter((l, i) => l || i < 2).join('\n');
+  const front = [`# ${n.title || 'Untitled'}`, '', `Created: ${n.created_at}`, `Updated: ${n.updated_at}`, ''].join('\n');
   return `${front}\n${td.turndown(docToHtml(n.content) || '')}\n`;
 }
 

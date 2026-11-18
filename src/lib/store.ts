@@ -34,7 +34,7 @@ export function createNote(init: Partial<Note> = {}): Promise<Note> {
   const content = init.content ?? { type: 'doc', content: [{ type: 'paragraph' }] };
   return insert<Note>('notes', {
     id: uuid(), user_id: currentUser, folder_id: null, title: '', content, content_text: docToText(content),
-    tags: [], pinned: false, favorite: false, archived: false, inbox: false,
+    favorite: false,
     created_at: t, updated_at: t, deleted_at: null, ...init,
   });
 }
@@ -46,12 +46,12 @@ export const saveNoteContent = async (id: string, content: unknown) => {
   await beforeEdit(id);
   return write<Note>('notes', id, { content, content_text: docToText(content) });
 };
-export const trashNote = (id: string) => write<Note>('notes', id, { deleted_at: now(), pinned: false });
+export const trashNote = (id: string) => write<Note>('notes', id, { deleted_at: now() });
 export const restoreNote = (id: string) => write<Note>('notes', id, { deleted_at: null });
 export async function duplicateNote(id: string) {
   const n = await db.notes.get(id); if (!n) return;
   const { _dirty, _rev, ...rest } = n;
-  return createNote({ ...rest, id: uuid(), title: `${n.title || 'Untitled'} (copy)`, pinned: false, created_at: now(), updated_at: now() });
+  return createNote({ ...rest, id: uuid(), title: `${n.title || 'Untitled'} (copy)`, created_at: now(), updated_at: now() });
 }
 
 // ---------- folders ----------

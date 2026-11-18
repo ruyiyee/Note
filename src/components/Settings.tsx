@@ -74,6 +74,7 @@ export default function Settings({ onClose, session }: { onClose: () => void; se
             <tr><td><kbd>Ctrl/⌘ Alt N</kbd></td><td>New note</td></tr>
             <tr><td><kbd>Ctrl/⌘ K</kbd></td><td>Search</td></tr>
             <tr><td><kbd>Ctrl/⌘ {'\\'}</kbd></td><td>Show or hide the sidebar</td></tr>
+            <tr><td><kbd>Ctrl/⌘ Shift E</kbd></td><td>Full width</td></tr>
             <tr><td><kbd>Ctrl/⌘ S</kbd></td><td>Sync now</td></tr>
             <tr><td><kbd>Ctrl/⌘ B / I / U</kbd></td><td>Bold, italic, underline</td></tr>
           </tbody></table>

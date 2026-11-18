@@ -32,7 +32,8 @@ export default function Workspace({ session }: { session: Session }) {
   const [showSettings, setShowSettings] = useState(false);
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const [wide, setWide] = useState(() => { try { return localStorage.getItem('wide') === '1'; } catch { return false; } });
-  const toggleWide = () => setWide((w) => { try { localStorage.setItem('wide', w ? '0' : '1'); } catch { /* ignore */ } return !w; });
+  useEffect(() => { try { localStorage.setItem('wide', wide ? '1' : '0'); } catch { /* ignore */ } }, [wide]);
+  const toggleWide = () => setWide((w) => !w);
 
   const notes = useLiveQuery(() => db.notes.toArray(), [], []);
   const allFolders = useLiveQuery(() => db.folders.toArray(), [], []);

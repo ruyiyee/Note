@@ -89,7 +89,8 @@ export function lassoSelect(strokes: Stroke[], poly: number[]): number[] {
   return strokes.flatMap((s, i) => {
     let n = 0;
     for (let k = 0; k < s.p.length; k += 2) if (pointInPolygon(s.p[k], s.p[k + 1], poly)) n++;
-    return n * 2 >= s.p.length / 2 ? [i] : [];
+    const points = s.p.length / 2;
+    return n * 2 >= points ? [i] : [];
   });
 }
 

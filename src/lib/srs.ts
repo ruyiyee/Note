@@ -18,4 +18,3 @@ export function review(card: Card, grade: 0 | 1 | 2 | 3, now = new Date()): Part
 }
 
 export const isDue = (c: Card, now = new Date()) => !c.deleted_at && new Date(c.due_at) <= now;
-export const isLearned = (c: Card) => c.interval_days >= 21;

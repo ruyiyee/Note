@@ -7,7 +7,8 @@
 // - pull(): fetches rows with server updated_at > per-table cursor. A local row
 //   that is still dirty is kept (local wins; it will be pushed next).
 // - Conflict policy: last write wins per row. Overwritten note content is still
-//   recoverable from note_versions (server trigger snapshots old content).
+//   recoverable from version history (see versions.ts).
+// - Notes deleted for good (Empty Trash) on another device are removed here too.
 // - Triggers: local edits (debounced), app start, window focus, coming back
 //   online, a 60s interval, and Supabase Realtime change events.
 import { db, getMeta, setMeta } from './db';
@@ -17,7 +18,13 @@ import { SYNCED_TABLES, type SyncedTable } from './types';
 export interface Remote {
   upsert(table: SyncedTable, rows: any[]): Promise<any[]>;
   pullSince(table: SyncedTable, since: string | null, limit: number): Promise<any[]>;
+  /** Which of these ids still exist on the server. */
+  existingIds(table: SyncedTable, ids: string[]): Promise<string[]>;
 }
+
+// Re-read a few seconds before the cursor: a change saved on another device at the same
+// moment can get a slightly earlier timestamp than one already pulled.
+const OVERLAP_MS = 5000;
 
 export type SyncState = 'idle' | 'syncing' | 'offline' | 'error';
 interface Status { state: SyncState; pending: number; lastSyncedAt: string | null; error: string | null }
@@ -77,8 +84,9 @@ export async function pull(remote: Remote) {
     const table = db.table_(t);
     const key = `cursor:${t}`;
     let cursor = (await getMeta<string>(key)) ?? null;
+    let since = cursor && new Date(Date.parse(cursor) - OVERLAP_MS).toISOString();
     for (;;) {
-      const rows = await remote.pullSince(t, cursor, 1000);
+      const rows = await remote.pullSince(t, since, 1000);
       if (!rows.length) break;
       await db.transaction('rw', table, async () => {
         for (const r of rows) {
@@ -87,13 +95,28 @@ export async function pull(remote: Remote) {
           await table.put({ ...r, _dirty: 0, _rev: cur?._rev ?? 0 });
         }
       });
-      cursor = rows[rows.length - 1].updated_at;
+      if (!cursor || rows[rows.length - 1].updated_at > cursor) cursor = rows[rows.length - 1].updated_at;
       await setMeta(key, cursor);
+      since = cursor;
       if (rows.length < 1000) break;
     }
+    if (t === 'notes') await dropPurgedNotes(remote);
    } catch (e) { firstErr ??= e; }
   }
   if (firstErr) throw firstErr;
+}
+
+/** Remove notes from this device's Trash that were emptied from Trash on another device. */
+async function dropPurgedNotes(remote: Remote) {
+  const ids = (await db.notes.filter((n) => !!n.deleted_at && n._dirty !== 1).toArray()).map((n) => n.id);
+  if (!ids.length) return;
+  const alive = new Set(await remote.existingIds('notes', ids));
+  const gone = ids.filter((id) => !alive.has(id));
+  if (!gone.length) return;
+  await db.transaction('rw', db.notes, db.attachments, async () => {
+    await db.notes.bulkDelete(gone);
+    await db.attachments.where('note_id').anyOf(gone).delete();
+  });
 }
 
 let running: Promise<void> | null = null;

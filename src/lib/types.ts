@@ -27,11 +27,7 @@ export interface Note extends LocalMeta {
   title: string;
   content: unknown | null; // TipTap JSON
   content_text: string;
-  tags: string[];
-  pinned: boolean;
   favorite: boolean;
-  archived: boolean;
-  inbox: boolean;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
