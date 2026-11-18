@@ -13,6 +13,7 @@ _Last updated: 2026-11-16 (navy and pink theme, drawing tools, pages)_
 - [x] Delete version history: one version, all versions of a note (History panel), or all history (Settings → Your data); uses the existing "own rows" RLS, no extra SQL
 - [x] Word count under the note (total, or "N of M words selected" while text is selected; CJK characters count as one word each)
 - [x] Version history with restore (Summary was removed at the user's request)
+- [x] Images live only inside the note (pasted at the cursor, dropped where dropped, movable by dragging); the "Files" list under a note shows only non-image files such as PDFs (`tests/e2e/images-inline.cjs`)
 - [x] Colourful PDF export in the app palette (title accent, coloured headings and bullets, navy table header, highlights kept)
 - [x] PDF export of a note or a notebook (browser print dialog); JSON + Markdown export of everything
 - [x] Tasks: standalone list with optional due date

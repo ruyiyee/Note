@@ -27,21 +27,24 @@ export default function Editor({ note, folders, onBack, onClose, onOpen, wide, o
   const pendingDoc = useRef<unknown>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const attachments = useLiveQuery(() => db.attachments.where('note_id').equals(note.id).toArray(), [note.id], []);
-  const files = attachments.filter((a) => !a.deleted_at);
+  // Images live inside the note itself, so only other files (PDFs) are listed under the note.
+  const files = attachments.filter((a) => !a.deleted_at && !a.mime.startsWith('image/'));
 
   const flush = () => {
     clearTimeout(saveTimer.current);
     if (pendingDoc.current) { const d = pendingDoc.current; pendingDoc.current = null; saveNoteContent(note.id, d).finally(() => setSaving(false)); }
   };
 
-  async function handleFiles(list: File[], editor: TEditor | null) {
+  async function handleFiles(list: File[], editor: TEditor | null, at?: number) {
     setErr(null);
     for (const f of list) {
       try {
         const a = await uploadFile(f, note.id);
         if (f.type.startsWith('image/') && editor) {
           const url = await signedUrl(a.path);
-          editor.chain().focus().setImage({ src: url, alt: f.name, path: a.path } as any).run();
+          const img = { type: 'image', attrs: { src: url, alt: f.name, path: a.path } };
+          if (at !== undefined && at <= editor.state.doc.content.size) { editor.chain().focus().insertContentAt(at, img).run(); at = undefined; }
+          else editor.chain().focus().insertContent(img).run();
         }
       } catch (e: any) { setErr(e.message ?? String(e)); }
     }
@@ -54,7 +57,8 @@ export default function Editor({ note, folders, onBack, onClose, onOpen, wide, o
     editorProps: {
       attributes: { class: 'prose', ...checkAttrs(spell) },
       handlePaste: (_v, e) => { const fs = [...(e.clipboardData?.files ?? [])]; if (fs.length) { handleFiles(fs, editorRef.current); return true; } return false; },
-      handleDrop: (_v, e) => { const fs = [...((e as DragEvent).dataTransfer?.files ?? [])]; if (fs.length) { e.preventDefault(); handleFiles(fs, editorRef.current); return true; } return false; },
+      // Dropped files go exactly where they are dropped. Dragging an image already in the note moves it.
+      handleDrop: (v, e) => { const de = e as DragEvent; const fs = [...(de.dataTransfer?.files ?? [])]; if (fs.length) { e.preventDefault(); handleFiles(fs, editorRef.current, v.posAtCoords({ left: de.clientX, top: de.clientY })?.pos); return true; } return false; },
     },
     onUpdate: ({ editor }) => {
       pendingDoc.current = editor.getJSON(); setSaving(true);
@@ -153,7 +157,7 @@ export default function Editor({ note, folders, onBack, onClose, onOpen, wide, o
               onChange={(e) => { handleFiles([...(e.target.files ?? [])], editor); e.target.value = ''; }} />
             {files.length > 0 && (
               <div className="attachments">
-                <h4>Attachments</h4>
+                <h4>Files</h4>
                 {files.map((a) => (
                   <div key={a.id} className="attachment">
                     <button className="text-btn on grow" onClick={async () => { try { window.open(await signedUrl(a.path), '_blank', 'noopener'); } catch (e: any) { setErr(e.message); } }}>{a.name}</button>
